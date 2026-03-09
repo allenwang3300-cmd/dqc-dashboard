@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Openclaw DQC 数据质量巡检看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
+      --accent: #58a6ff; --green: #3fb950; --red: #f78166; --yellow: #e3b341;
+      --purple: #d2a8ff; --text: #e6edf3; --muted: #8b949e; --dim: #484f58;
+      --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; min-height: 100vh; padding: 20px 24px 40px; }
+
+    /* ---- Header ---- */
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .header-title h1 { font-size: 18px; font-weight: 700; }
+    .header-title p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .header-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: var(--accent); }
+    .meta-info { font-size: 11px; color: var(--muted); }
+
+    /* ---- Status Bar ---- */
+    .status-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); flex-shrink: 0; }
+    .dot.warn { background: var(--red); box-shadow: 0 0 5px var(--red); }
+
+    /* ---- Section Divider ---- */
+    .section { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .section-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; white-space: nowrap; }
+    .section-line { flex: 1; height: 1px; background: var(--border); }
+
+    /* ---- Grid ---- */
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+    /* ---- Card Base ---- */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); transition: border-color .2s, transform .15s; position: relative; overflow: hidden; }
+    .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--card-accent, var(--accent)), transparent); }
+    .card-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; font-weight: 600; margin-bottom: 12px; }
+    .card-icon { position: absolute; top: 16px; right: 16px; font-size: 22px; opacity: .12; }
+
+    /* ---- KPI Card ---- */
+    .kpi-value { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .kpi-sub { font-size: 11px; color: var(--muted); }
+
+    /* ---- Compare Card ---- */
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .compare-item label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px; }
+    .compare-item .val { font-size: 22px; font-weight: 700; }
+    .diff-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .diff-val { font-weight: 700; }
+    .diff-pct { font-size: 11px; color: var(--muted); }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+
+    /* ---- Chart Card ---- */
+    .card-wide { grid-column: span 2; }
+    .card-full { grid-column: 1 / -1; }
+    .chart-wrap { position: relative; height: 180px; }
+
+    /* ---- Table Card ---- */
+    .tbl-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { position: sticky; top: 0; background: var(--surface2); color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+    thead th:first-child { text-align: left; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 6px 8px; text-align: right; color: var(--text); }
+    tbody td:first-child { text-align: left; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag-high { color: var(--red); font-weight: 600; }
+    .tag-pos { color: var(--green); }
+    .tag-neg { color: var(--red); }
+
+    /* ---- Double Table ---- */
+    .double-table { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .sub-table-title { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+
+    /* ---- Click Compare ---- */
+    .click-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .click-col { background: var(--surface2); border-radius: 8px; padding: 12px; }
+    .click-col-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .click-metric { margin-bottom: 6px; }
+    .click-metric label { font-size: 10px; color: var(--dim); display: block; }
+    .click-metric .v { font-size: 16px; font-weight: 700; }
+    .click-diff-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+
+    /* ---- Top App List ---- */
+    .app-list { display: flex; flex-direction: column; gap: 6px; }
+    .app-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border-radius: 6px; padding: 8px 10px; }
+    .app-rank { font-size: 11px; color: var(--dim); font-weight: 700; width: 20px; flex-shrink: 0; }
+    .app-name { font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 8px; }
+    .app-rev { font-size: 13px; font-weight: 700; color: var(--green); flex-shrink: 0; }
+
+    /* ---- Scrollbar ---- */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } .card-wide { grid-column: span 2; } }
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .card-wide, .card-full { grid-column: span 1; } .double-table, .click-compare { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🦞</div>
+    <div class="header-title">
+      <h1>Openclaw DQC 数据质量巡检看板</h1>
+      <p>VibeWave · 海外移动互联网广告投放 AI 工作站</p>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div class="badge" id="reportBadge">MORNING</div>
+    <div class="meta-info" id="reportMeta"></div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="dot" id="statusDot"></div>
+  <strong id="statusText">系统运行正常</strong>
+  <span style="color:var(--dim)">·</span>
+  <span id="statusDetail" style="color:var(--muted)"></span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const REPORT = {"report_title": "海外移动互联网广告投放AI工作站 - Evening数据质量巡检报告", "report_time_beijing": "2026-03-09 14:00:17", "report_date": "2026-03-09", "yesterday": "2026-03-08", "day_before": "2026-03-07", "report_type": "evening", "cards": [{"id": "revenue_by_date", "title": "核心收入对比 (Revenue by Date)", "yesterday": "$5,935.23", "day_before": "$7,017.28", "diff": "$-1,082.05", "diff_pct": "-15.4%", "is_positive": false}, {"id": "recent_revenue_trends", "title": "近期收入趋势 (Recent Revenue Trends)", "type": "line_chart", "data": {"labels": ["2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09"], "datasets": [{"label": "收入 (USD)", "data": [6481.76, 7017.28, 5935.23, 1811.8]}]}}, {"id": "revenue_by_am", "title": "按 AM 收入对比 (Revenue by AM)", "type": "table", "rows": [{"source_manager": "Phoebe", "yesterday": 1413.57, "day_before": 1623.69, "diff": -210.12, "is_positive": false}, {"source_manager": "Ria", "yesterday": 1366.02, "day_before": 1460.07, "diff": -94.05, "is_positive": false}, {"source_manager": "Angelica", "yesterday": 1266.05, "day_before": 1724.11, "diff": -458.06, "is_positive": false}, {"source_manager": "helin", "yesterday": 1189.42, "day_before": 1373.74, "diff": -184.32, "is_positive": false}, {"source_manager": "Hedy", "yesterday": 428.42, "day_before": 511.97, "diff": -83.55, "is_positive": false}, {"source_manager": "Claire", "yesterday": 137.5, "day_before": 142.7, "diff": -5.2, "is_positive": false}, {"source_manager": "Chloe", "yesterday": 126.25, "day_before": 121.8, "diff": 4.45, "is_positive": true}, {"source_manager": "Sylva", "yesterday": 8.0, "day_before": 59.2, "diff": -51.2, "is_positive": false}, {"source_manager": "SylvaMaster", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Serena", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Mia", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Lisa", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Angie", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Allen", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}]}, {"id": "adv_am_app_top10", "title": "核心维度 Top 10 升降榜 (ADV + AM + APP)", "type": "double_table", "increase": [{"dimension": "Zilmtech / helin / 1457956232", "yesterday": 280.0, "day_before": 190.0, "diff": 90.0, "pct": 47.4}, {"dimension": "AutomateTech / Phoebe / com.fivepaisa.trade", "yesterday": 80.5, "day_before": 3.5, "diff": 77.0, "pct": 2200.0}, {"dimension": "Thrillzz Social Fun Sportsbook / Angelica / 6499589754", "yesterday": 75.0, "day_before": 10.0, "diff": 65.0, "pct": 650.0}, {"dimension": "Power Up Money-Ria / Ria / 6470202376", "yesterday": 196.95, "day_before": 154.7, "diff": 42.25, "pct": 27.3}, {"dimension": "DataZop-MMP / Phoebe / 1005391121", "yesterday": 70.0, "day_before": 35.0, "diff": 35.0, "pct": 100.0}, {"dimension": "Farly-Ria / Ria / 1395667279", "yesterday": 613.0, "day_before": 578.0, "diff": 35.0, "pct": 6.1}, {"dimension": "clickorbits / Hedy / 1552874948", "yesterday": 35.0, "day_before": 0, "diff": 35.0, "pct": 100.0}, {"dimension": "Mobupps / Angelica / 6499306806", "yesterday": 192.0, "day_before": 161.0, "diff": 31.0, "pct": 19.3}, {"dimension": "腾讯 三国 / Angelica / com.qookkagames.xczyw.gp.hk", "yesterday": 100.0, "day_before": 70.0, "diff": 30.0, "pct": 42.9}, {"dimension": "Power Up Money-Ria / Ria / money.powerup.uni.invest.app", "yesterday": 202.15, "day_before": 184.6, "diff": 17.55, "pct": 9.5}], "decrease": [{"dimension": "Mobupps / Angelica / 1564391515", "yesterday": 197.5, "day_before": 570.0, "diff": -372.5, "pct": -65.4}, {"dimension": "腾讯 三国 / Angelica / com.sialiagames.xczyw.gp.tw", "yesterday": 80.0, "day_before": 270.0, "diff": -190.0, "pct": -70.4}, {"dimension": "ADVA Soft / helin / 373311252", "yesterday": 180.0, "day_before": 324.0, "diff": -144.0, "pct": -44.4}, {"dimension": "mobisummer--api / Phoebe / 1589643727", "yesterday": 510.0, "day_before": 630.0, "diff": -120.0, "pct": -19.0}, {"dimension": "Cchange / helin / com.taxis99", "yesterday": 194.65, "day_before": 265.36, "diff": -70.71, "pct": -26.6}, {"dimension": "Rocket Lab-ria / Ria / 1531467766", "yesterday": 76.0, "day_before": 140.0, "diff": -64.0, "pct": -45.7}, {"dimension": "AutomateTech / Phoebe / com.indusind.indie", "yesterday": 11.0, "day_before": 66.0, "diff": -55.0, "pct": -83.3}, {"dimension": "Zype-Ria / Ria / com.anytimerupee", "yesterday": 126.0, "day_before": 176.4, "diff": -50.4, "pct": -28.6}, {"dimension": "Bybit / Sylva / com.bybit.app", "yesterday": 0, "day_before": 50.0, "diff": -50.0, "pct": -100.0}, {"dimension": "Bybit-Ria / Ria / com.bybit.app", "yesterday": 0, "day_before": 50.0, "diff": -50.0, "pct": -100.0}]}, {"id": "top_app", "title": "Top 收入/安装 APP", "type": "double_table", "top_revenue": [{"prod": "1395667279", "yesterday": 855.0, "day_before": 815.0, "diff": 40.0}, {"prod": "1589643727", "yesterday": 510.0, "day_before": 630.0, "diff": -120.0}, {"prod": "553663691", "yesterday": 284.5, "day_before": 279.2, "diff": 5.3}, {"prod": "1457956232", "yesterday": 280.0, "day_before": 190.0, "diff": 90.0}, {"prod": "com.taxis99", "yesterday": 273.5, "day_before": 324.86, "diff": -51.36}], "top_install": [{"prod": "1531467766", "yesterday": 32567, "day_before": 34154, "diff": -1587}, {"prod": "com.picpay", "yesterday": 20798, "day_before": 18391, "diff": 2407}, {"prod": "com.mbmobile", "yesterday": 5885, "day_before": 3216, "diff": 2669}, {"prod": "com.bybit.app", "yesterday": 5733, "day_before": 3432, "diff": 2301}, {"prod": "live.shorttv.apps", "yesterday": 5087, "day_before": 4549, "diff": 538}, {"prod": "com.taxis99", "yesterday": 4934, "day_before": 6080, "diff": -1146}, {"prod": "ph.atome.paylater", "yesterday": 4270, "day_before": 5941, "diff": -1671}, {"prod": "553663691", "yesterday": 4252, "day_before": 4143, "diff": 109}, {"prod": "1488296980", "yesterday": 4012, "day_before": 3616, "diff": 396}, {"prod": "1577294865", "yesterday": 3745, "day_before": 5011, "diff": -1266}]}, {"id": "fraud_by_country", "title": "国家维度作弊 Top 10 (Yesterday)", "type": "table", "rows": [{"country": "PH", "reject_install": 1206, "true_install": 9302, "reject_rate": "11.5%", "is_high": false}, {"country": "BR", "reject_install": 1172, "true_install": 24344, "reject_rate": "4.6%", "is_high": false}, {"country": "MX", "reject_install": 713, "true_install": 10718, "reject_rate": "6.2%", "is_high": false}, {"country": "IN", "reject_install": 437, "true_install": 11370, "reject_rate": "3.7%", "is_high": false}, {"country": "VN", "reject_install": 249, "true_install": 6491, "reject_rate": "3.7%", "is_high": false}, {"country": "TH", "reject_install": 247, "true_install": 1064, "reject_rate": "18.8%", "is_high": false}, {"country": "US", "reject_install": 164, "true_install": 10316, "reject_rate": "1.6%", "is_high": false}, {"country": "AE", "reject_install": 157, "true_install": 3431, "reject_rate": "4.4%", "is_high": false}, {"country": "ID", "reject_install": 108, "true_install": 3746, "reject_rate": "2.8%", "is_high": false}, {"country": "EG", "reject_install": 62, "true_install": 563, "reject_rate": "9.9%", "is_high": false}]}, {"id": "track_source_click", "title": "核心点击数据对比 (Track Source Click)", "yesterday": {"total_clicks": 3584385267, "success_clicks": 2905270637, "success_rate": "81.1%"}, "day_before": {"total_clicks": 5915432396, "success_clicks": 4798734622, "success_rate": "81.1%"}, "sc_diff_yi": "-18.93 亿", "sc_is_positive": false}, {"id": "app_tracksource_click", "title": "APP 维度点击 Top 30 (APP-TrackSource Click)", "type": "table", "rows": [{"app_name": "373311252", "total_clicks": 367464731, "success_clicks": 343660191, "success_rate": "93.5%"}, {"app_name": "1395667279", "total_clicks": 243765599, "success_clicks": 236093318, "success_rate": "96.9%"}, {"app_name": "6464002625", "total_clicks": 198479580, "success_clicks": 198461795, "success_rate": "100.0%"}, {"app_name": "com.intech.c66app", "total_clicks": 137736137, "success_clicks": 124629776, "success_rate": "90.5%"}, {"app_name": "1072084799", "total_clicks": 125285233, "success_clicks": 124313768, "success_rate": "99.2%"}, {"app_name": "1344702806", "total_clicks": 83805931, "success_clicks": 79946402, "success_rate": "95.4%"}, {"app_name": "6470202376", "total_clicks": 87707103, "success_clicks": 79050564, "success_rate": "90.1%"}, {"app_name": "489262811", "total_clicks": 69239546, "success_clicks": 58453181, "success_rate": "84.4%"}, {"app_name": "com.epifi.paisa", "total_clicks": 56863687, "success_clicks": 56132567, "success_rate": "98.7%"}, {"app_name": "live.shorttv.apps", "total_clicks": 53528496, "success_clicks": 50397495, "success_rate": "94.2%"}, {"app_name": "com.exness.android.pa", "total_clicks": 63145962, "success_clicks": 49110350, "success_rate": "77.8%"}, {"app_name": "com.wallester.whitelabel", "total_clicks": 45821291, "success_clicks": 43115597, "success_rate": "94.1%"}, {"app_name": "553663691", "total_clicks": 45693308, "success_clicks": 41710713, "success_rate": "91.3%"}, {"app_name": "com.fivepaisa.trade", "total_clicks": 42895916, "success_clicks": 41216776, "success_rate": "96.1%"}, {"app_name": "1550252286", "total_clicks": 42460466, "success_clicks": 41193885, "success_rate": "97.0%"}, {"app_name": "com.ixdigit.hanson", "total_clicks": 37505350, "success_clicks": 37170081, "success_rate": "99.1%"}, {"app_name": "com.picpay", "total_clicks": 35396046, "success_clicks": 34667066, "success_rate": "97.9%"}, {"app_name": "1553246917", "total_clicks": 31781437, "success_clicks": 28683997, "success_rate": "90.3%"}, {"app_name": "6743699672", "total_clicks": 33820228, "success_clicks": 27924119, "success_rate": "82.6%"}, {"app_name": "1641483899", "total_clicks": 27760349, "success_clicks": 27565682, "success_rate": "99.3%"}, {"app_name": "com.sisal.sisalfunclub", "total_clicks": 27759359, "success_clicks": 27565409, "success_rate": "99.3%"}, {"app_name": "com.mocamoca", "total_clicks": 35261660, "success_clicks": 26667724, "success_rate": "75.6%"}, {"app_name": "org.betwinner_cd.client-Custom", "total_clicks": 37435431, "success_clicks": 25188208, "success_rate": "67.3%"}, {"app_name": "com.arenaplus.sport", "total_clicks": 31434513, "success_clicks": 23773881, "success_rate": "75.6%"}, {"app_name": "1359763701", "total_clicks": 58083770, "success_clicks": 23386891, "success_rate": "40.3%"}, {"app_name": "6740983811", "total_clicks": 23016194, "success_clicks": 22708883, "success_rate": "98.7%"}, {"app_name": "com.acko.android", "total_clicks": 26592174, "success_clicks": 22664991, "success_rate": "85.2%"}, {"app_name": "1457956232", "total_clicks": 28149557, "success_clicks": 21687135, "success_rate": "77.0%"}, {"app_name": "com.personalLoan.loan112", "total_clicks": 22570425, "success_clicks": 21008520, "success_rate": "93.1%"}, {"app_name": "1518452187", "total_clicks": 28988610, "success_clicks": 20952753, "success_rate": "72.3%"}]}, {"id": "today_revenue", "title": "今日收入进度 (截至 UTC 05:00)", "today": "$1,811.80", "yesterday_same": "$1,623.19", "diff": "+$188.61", "diff_pct": "+11.6%", "is_positive": true, "cutoff_hour": 5}, {"id": "today_top_app", "title": "今日 Top 5 APP (Today Top APP)", "type": "list", "items": [{"prod": "1395667279", "revenue": 221.0}, {"prod": "1589643727", "revenue": 180.0}, {"prod": "1564391515", "revenue": 175.0}, {"prod": "com.taxis99", "revenue": 106.35}, {"prod": "com.anytimerupee", "revenue": 100.8}]}, {"id": "today_rejection", "title": "今日作弊情况 (Today Rejection by Country Top 10)", "type": "table", "rows": [{"country": "PH", "reject_install": 265, "true_install": 62, "reject_rate": "81.0%", "is_high": true}, {"country": "IN", "reject_install": 41, "true_install": 367, "reject_rate": "10.0%", "is_high": false}, {"country": "BR", "reject_install": 32, "true_install": 733, "reject_rate": "4.2%", "is_high": false}, {"country": "VN", "reject_install": 16, "true_install": 109, "reject_rate": "12.8%", "is_high": false}, {"country": "MX", "reject_install": 9, "true_install": 596, "reject_rate": "1.5%", "is_high": false}, {"country": "TH", "reject_install": 9, "true_install": 32, "reject_rate": "22.0%", "is_high": false}, {"country": "US", "reject_install": 9, "true_install": 1142, "reject_rate": "0.8%", "is_high": false}, {"country": "ID", "reject_install": 7, "true_install": 218, "reject_rate": "3.1%", "is_high": false}, {"country": "FR", "reject_install": 5, "true_install": 1, "reject_rate": "83.3%", "is_high": true}, {"country": "MY", "reject_install": 5, "true_install": 1, "reject_rate": "83.3%", "is_high": true}]}], "last_update_beijing": "2026-03-09 14:00:14", "inserted_count": 0};
+const COLORS = ["#58a6ff", "#3fb950", "#ffa657", "#d2a8ff", "#f78166", "#79c0ff", "#56d364", "#e3b341", "#bc8cff", "#ff7b72"];
+
+function fmt(n) { return typeof n === 'number' ? n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (n || '--'); }
+function fmtInt(n) { return typeof n === 'number' ? n.toLocaleString('en-US') : (n || '--'); }
+
+function card(cls, accentColor) {
+  var e = document.createElement('div');
+  e.className = 'card' + (cls ? ' ' + cls : '');
+  if (accentColor) e.style.setProperty('--card-accent', accentColor);
+  return e;
+}
+
+function section(label) {
+  var e = document.createElement('div');
+  e.className = 'section';
+  e.innerHTML = '<div class="section-line"></div><div class="section-label">' + label + '</div><div class="section-line"></div>';
+  return e;
+}
+
+function renderAll() {
+  var g = document.getElementById('grid');
+  g.innerHTML = '';
+
+  // Header meta
+  var m = REPORT.report_title.match(/(morning|afternoon|evening)/i);
+  document.getElementById('reportBadge').textContent = m ? m[0].toUpperCase() : 'REPORT';
+  document.getElementById('reportMeta').textContent = '生成时间：' + REPORT.report_time_beijing + '（北京时间）  |  Yesterday: ' + REPORT.yesterday + '  DayBefore: ' + REPORT.day_before;
+  document.getElementById('statusDetail').textContent = '最后更新：' + (REPORT.last_update_beijing || '--') + '  ·  本次采集新增 ' + (REPORT.inserted_count || 0) + ' 条';
+
+  var cards = {};
+  REPORT.cards.forEach(function(c) { cards[c.id] = c; });
+
+  // ── Section A: 收入巡检 ──────────────────────────────────────────────
+  g.appendChild(section('A · 收入巡检 (Revenue)'));
+
+  // Card 1: Revenue by Date
+  var c1 = cards['revenue_by_date'];
+  if (c1) {
+    var e1 = card('card-wide', '#58a6ff');
+    var isPos1 = c1.is_positive;
+    e1.innerHTML = '<div class="card-icon">💰</div><div class="card-title">' + c1.title + '</div>' +
+      '<div class="compare-grid">' +
+        '<div class="compare-item"><label>Yesterday (' + REPORT.yesterday + ')</label><div class="val" style="color:var(--accent)">' + c1.yesterday + '</div></div>' +
+        '<div class="compare-item"><label>DayBefore (' + REPORT.day_before + ')</label><div class="val">' + c1.day_before + '</div></div>' +
+      '</div>' +
+      '<div class="diff-row"><span class="diff-val ' + (isPos1?'pos':'neg') + '">' + c1.diff + '</span><span class="diff-pct">' + c1.diff_pct + '</span></div>';
+    g.appendChild(e1);
+  }
+
+  // Card 2: Revenue Trends (line chart)
+  var c2 = cards['recent_revenue_trends'];
+  if (c2) {
+    var e2 = card('card-wide', '#58a6ff');
+    e2.innerHTML = '<div class="card-title">' + c2.title + '</div><div class="chart-wrap"><canvas id="trendChart"></canvas></div>';
+    g.appendChild(e2);
+  }
+
+  // Card 3: Revenue by AM
+  var c3 = cards['revenue_by_am'];
+  if (c3) {
+    var e3 = card('card-wide', '#d2a8ff');
+    e3.innerHTML = '<div class="card-title">' + c3.title + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>AM</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
+      (c3.rows || []).map(function(r) {
+        return '<tr><td>' + r.source_manager + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + (r.is_positive?'tag-pos':'tag-neg') + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    g.appendChild(e3);
+  }
+
+  // Card 4: ADV+AM+APP Top10
+  var c4 = cards['adv_am_app_top10'];
+  if (c4) {
+    var e4 = card('card-full', '#ffa657');
+    e4.innerHTML = '<div class="card-title">' + c4.title + '</div>' +
+      '<div class="double-table">' +
+        '<div><div class="sub-table-title" style="color:var(--green)">🔺 增长 Top 10</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>维度 (ADV / AM / APP)</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
+        (c4.increase || []).map(function(r) {
+          return '<tr><td title="' + r.dimension + '">' + r.dimension + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="tag-pos">+$' + fmt(r.diff) + '</td><td class="tag-pos">+' + r.pct + '%</td></tr>';
+        }).join('') + '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--red)">🔻 下降 Top 10</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>维度 (ADV / AM / APP)</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
+        (c4.decrease || []).map(function(r) {
+          return '<tr><td title="' + r.dimension + '">' + r.dimension + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="tag-neg">$' + fmt(r.diff) + '</td><td class="tag-neg">' + r.pct + '%</td></tr>';
+        }).join('') + '</tbody></table></div></div>' +
+      '</div>';
+    g.appendChild(e4);
+  }
+
+  // Card 5: Top Revenue APP + Top Install APP
+  var c5 = cards['top_app'];
+  if (c5) {
+    var e5 = card('card-full', '#56d364');
+    e5.innerHTML = '<div class="card-title">' + c5.title + '</div>' +
+      '<div class="double-table">' +
+        '<div><div class="sub-table-title">Top 5 收入 APP</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
+        (c5.top_revenue || []).map(function(r) {
+          return '<tr><td>' + (r.prod || '--') + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + (r.diff>=0?'tag-pos':'tag-neg') + '">' + (r.diff>=0?'+':'') + '$' + fmt(r.diff) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title">Top 10 安装 APP</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
+        (c5.top_install || []).map(function(r) {
+          return '<tr><td>' + (r.prod || '--') + '</td><td>' + fmtInt(r.yesterday) + '</td><td>' + fmtInt(r.day_before) + '</td><td class="' + (r.diff>=0?'tag-pos':'tag-neg') + '">' + (r.diff>=0?'+':'') + fmtInt(r.diff) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>' +
+      '</div>';
+    g.appendChild(e5);
+  }
+
+  // ── Section B: 作弊巡检 ──────────────────────────────────────────────
+  g.appendChild(section('B · 作弊巡检 (Fraud)'));
+
+  // Card 6: Fraud by Country
+  var c6 = cards['fraud_by_country'];
+  if (c6) {
+    var e6 = card('card-wide', '#f78166');
+    e6.innerHTML = '<div class="card-icon">🚫</div><div class="card-title">' + c6.title + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Country</th><th>Reject Install</th><th>True Install</th><th>Reject Rate</th></tr></thead><tbody>' +
+      (c6.rows || []).map(function(r) {
+        return '<tr><td>' + r.country + '</td><td>' + fmtInt(r.reject_install) + '</td><td>' + fmtInt(r.true_install) + '</td><td class="' + (r.is_high?'tag-high':'') + '">' + r.reject_rate + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    g.appendChild(e6);
+  }
+
+  // ── Section C: 点击巡检 ──────────────────────────────────────────────
+  g.appendChild(section('C · 点击巡检 (Click)'));
+
+  // Card 7: Track Source Click Compare
+  var c7 = cards['track_source_click'];
+  if (c7) {
+    var e7 = card('card-wide', '#ffa657');
+    e7.innerHTML = '<div class="card-icon">👆</div><div class="card-title">' + c7.title + '</div>' +
+      '<div class="click-compare">' +
+        '<div class="click-col">' +
+          '<div class="click-col-label">Yesterday (' + REPORT.yesterday + ')</div>' +
+          '<div class="click-metric"><label>Total Click</label><div class="v">' + fmtInt(c7.yesterday.total_clicks) + '</div></div>' +
+          '<div class="click-metric"><label>Success Click</label><div class="v" style="color:var(--green)">' + fmtInt(c7.yesterday.success_clicks) + '</div></div>' +
+          '<div class="click-metric"><label>Success Rate</label><div class="v">' + c7.yesterday.success_rate + '</div></div>' +
+        '</div>' +
+        '<div class="click-col">' +
+          '<div class="click-col-label">DayBefore (' + REPORT.day_before + ')</div>' +
+          '<div class="click-metric"><label>Total Click</label><div class="v">' + fmtInt(c7.day_before.total_clicks) + '</div></div>' +
+          '<div class="click-metric"><label>Success Click</label><div class="v" style="color:var(--muted)">' + fmtInt(c7.day_before.success_clicks) + '</div></div>' +
+          '<div class="click-metric"><label>Success Rate</label><div class="v">' + c7.day_before.success_rate + '</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="click-diff-row">Success Click 变化：<span class="' + (c7.sc_is_positive?'pos':'neg') + '" style="font-weight:700">' + c7.sc_diff_yi + '</span></div>';
+    g.appendChild(e7);
+  }
+
+  // Card 8: APP TrackSource Click Top 30
+  var c8 = cards['app_tracksource_click'];
+  if (c8) {
+    var e8 = card('card-wide', '#79c0ff');
+    e8.innerHTML = '<div class="card-title">' + c8.title + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>App Name</th><th>Total Click</th><th>Success Click</th><th>Success Rate</th></tr></thead><tbody>' +
+      (c8.rows || []).map(function(r) {
+        return '<tr><td>' + (r.app_name || '--') + '</td><td>' + fmtInt(r.total_clicks) + '</td><td>' + fmtInt(r.success_clicks) + '</td><td>' + r.success_rate + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    g.appendChild(e8);
+  }
+
+  // ── Section D: 今日进度 ──────────────────────────────────────────────
+  g.appendChild(section('D · 今日进度 (Today Progress)'));
+
+  // Card 9: Today Revenue
+  var c9 = cards['today_revenue'];
+  if (c9) {
+    var e9 = card('card-wide', '#58a6ff');
+    var isPos9 = c9.is_positive;
+    e9.innerHTML = '<div class="card-icon">📈</div><div class="card-title">' + c9.title + '</div>' +
+      '<div class="compare-grid">' +
+        '<div class="compare-item"><label>今日累计</label><div class="val" style="color:var(--accent)">' + c9.today + '</div></div>' +
+        '<div class="compare-item"><label>昨日同期</label><div class="val">' + c9.yesterday_same + '</div></div>' +
+      '</div>' +
+      '<div class="diff-row"><span class="diff-val ' + (isPos9?'pos':'neg') + '">' + c9.diff + '</span><span class="diff-pct">' + c9.diff_pct + '</span></div>';
+    g.appendChild(e9);
+  }
+
+  // Card 10: Today Top APP
+  var c10 = cards['today_top_app'];
+  if (c10) {
+    var e10 = card(null, '#56d364');
+    e10.innerHTML = '<div class="card-icon">📱</div><div class="card-title">' + c10.title + '</div>' +
+      '<div class="app-list">' +
+      (c10.items || []).map(function(item, i) {
+        return '<div class="app-item"><span class="app-rank">#' + (i+1) + '</span><span class="app-name" title="' + item.prod + '">' + (item.prod || '--') + '</span><span class="app-rev">$' + fmt(item.revenue) + '</span></div>';
+      }).join('') +
+      '</div>';
+    g.appendChild(e10);
+  }
+
+  // Card 11: Today Rejection
+  var c11 = cards['today_rejection'];
+  if (c11) {
+    var e11 = card('card-wide', '#f78166');
+    e11.innerHTML = '<div class="card-icon">🚨</div><div class="card-title">' + c11.title + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Country</th><th>Reject Install</th><th>True Install</th><th>Reject Rate</th></tr></thead><tbody>' +
+      (c11.rows || []).map(function(r) {
+        return '<tr><td>' + r.country + '</td><td>' + fmtInt(r.reject_install) + '</td><td>' + fmtInt(r.true_install) + '</td><td class="' + (r.is_high?'tag-high':'') + '">' + r.reject_rate + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    g.appendChild(e11);
+  }
+
+  // ── Charts ──────────────────────────────────────────────────────────
+  requestAnimationFrame(function() {
+    // Trend Line Chart
+    if (c2 && document.getElementById('trendChart')) {
+      new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+          labels: c2.data.labels,
+          datasets: [{
+            label: '收入 (USD)',
+            data: c2.data.datasets[0].data,
+            borderColor: '#58a6ff',
+            backgroundColor: 'rgba(88,166,255,0.10)',
+            borderWidth: 2,
+            pointBackgroundColor: '#58a6ff',
+            pointRadius: 3,
+            tension: 0.35,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#21262d', borderColor: '#30363d', borderWidth: 1,
+              titleColor: '#8b949e', bodyColor: '#e6edf3',
+              callbacks: { label: function(ctx) { return ' $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); } }
+            }
+          },
+          scales: {
+            x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 8 } },
+            y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 }, callback: function(v) { return '$' + v.toLocaleString(); } } }
+          }
+        }
+      });
+    }
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>
