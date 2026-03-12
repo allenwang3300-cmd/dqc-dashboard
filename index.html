@@ -3,425 +3,532 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Openclaw DQC 数据质量巡检看板</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <title>APPID 数据看板</title>
   <style>
     :root {
-      --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
-      --accent: #58a6ff; --green: #3fb950; --red: #f78166; --yellow: #e3b341;
-      --purple: #d2a8ff; --text: #e6edf3; --muted: #8b949e; --dim: #484f58;
-      --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,.35);
+      --bg: #0f1117;
+      --card: #1a1d27;
+      --border: #2a2d3e;
+      --accent: #4f8ef7;
+      --accent2: #6ee7b7;
+      --danger: #f87171;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --success: #34d399;
+      --warning: #fbbf24;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; min-height: 100vh; padding: 20px 24px 40px; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; }
 
-    /* ---- Header ---- */
-    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-    .header-title h1 { font-size: 18px; font-weight: 700; }
-    .header-title p { font-size: 11px; color: var(--muted); margin-top: 2px; }
-    .header-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: var(--accent); }
-    .meta-info { font-size: 11px; color: var(--muted); }
+    /* ── Header ── */
+    .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .header .badge { background: #1e3a5f; color: var(--accent); padding: 2px 10px; border-radius: 20px; font-size: 11px; }
 
-    /* ---- Status Bar ---- */
-    .status-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px var(--green); flex-shrink: 0; }
-    .dot.warn { background: var(--red); box-shadow: 0 0 5px var(--red); }
+    /* ── Layout ── */
+    .container { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
+    .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
 
-    /* ---- Section Divider ---- */
-    .section { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-    .section-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; white-space: nowrap; }
-    .section-line { flex: 1; height: 1px; background: var(--border); }
+    /* ── Filter Row ── */
+    .filter-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .filter-group { display: flex; flex-direction: column; gap: 5px; }
+    .filter-group label { font-size: 11px; color: var(--muted); }
+    input[type="date"], select, input[type="text"] {
+      background: #0f1117; border: 1px solid var(--border); color: var(--text);
+      padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+    }
+    input[type="date"]:focus, select:focus, input[type="text"]:focus { border-color: var(--accent); }
+    .quick-btns { display: flex; gap: 6px; }
+    .quick-btn {
+      background: #1e2535; border: 1px solid var(--border); color: var(--muted);
+      padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all .15s;
+    }
+    .quick-btn:hover, .quick-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-    /* ---- Grid ---- */
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    /* ── Multiselect ── */
+    .multiselect-wrap { position: relative; }
+    .multiselect-trigger {
+      background: #0f1117; border: 1px solid var(--border); color: var(--text);
+      padding: 7px 32px 7px 10px; border-radius: 6px; cursor: pointer; min-width: 200px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px;
+    }
+    .multiselect-trigger::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .multiselect-dropdown {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 100;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      min-width: 220px; max-height: 260px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    }
+    .multiselect-dropdown.open { display: block; }
+    .multiselect-item { padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .multiselect-item:hover { background: #1e2535; }
+    .multiselect-item input[type="checkbox"] { accent-color: var(--accent); }
 
-    /* ---- Card Base ---- */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); transition: border-color .2s, transform .15s; position: relative; overflow: hidden; }
-    .card:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--card-accent, var(--accent)), transparent); }
-    .card-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; font-weight: 600; margin-bottom: 12px; }
-    .card-icon { position: absolute; top: 16px; right: 16px; font-size: 22px; opacity: .12; }
+    /* ── Buttons ── */
+    .btn { padding: 8px 18px; border-radius: 7px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #3a7de8; }
+    .btn-primary:disabled { background: #2a3a5a; color: var(--muted); cursor: not-allowed; }
+    .btn-secondary { background: #1e2535; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ---- KPI Card ---- */
-    .kpi-value { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
-    .kpi-sub { font-size: 11px; color: var(--muted); }
+    /* ── Pull Section ── */
+    .pull-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .pull-input { width: 320px; }
+    .checkbox-wrap { display: flex; align-items: center; gap: 8px; padding-bottom: 2px; }
+    .checkbox-wrap input { accent-color: var(--accent); width: 15px; height: 15px; }
+    .checkbox-wrap label { color: var(--text); cursor: pointer; }
 
-    /* ---- Compare Card ---- */
-    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .compare-item label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px; }
-    .compare-item .val { font-size: 22px; font-weight: 700; }
-    .diff-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-    .diff-val { font-weight: 700; }
-    .diff-pct { font-size: 11px; color: var(--muted); }
-    .pos { color: var(--green); }
-    .neg { color: var(--red); }
+    /* ── Status Bar ── */
+    .status-bar { padding: 10px 14px; border-radius: 7px; font-size: 12px; margin-top: 12px; display: none; }
+    .status-bar.running { display: block; background: #1e3a5f; color: var(--accent); border: 1px solid #2a4a7f; }
+    .status-bar.success { display: block; background: #0d2a1f; color: var(--success); border: 1px solid #1a4a35; }
+    .status-bar.error { display: block; background: #2a1010; color: var(--danger); border: 1px solid #4a2020; }
 
-    /* ---- Chart Card ---- */
-    .card-wide { grid-column: span 2; }
-    .card-full { grid-column: 1 / -1; }
-    .chart-wrap { position: relative; height: 180px; }
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+    .tab {
+      padding: 8px 16px; cursor: pointer; border-radius: 6px 6px 0 0; font-size: 13px;
+      color: var(--muted); border: 1px solid transparent; border-bottom: none; margin-bottom: -1px;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { background: var(--card); color: var(--accent); border-color: var(--border); border-bottom-color: var(--card); }
 
-    /* ---- Table Card ---- */
-    .tbl-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    thead th { position: sticky; top: 0; background: var(--surface2); color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+    thead th {
+      background: #0f1117; color: var(--muted); font-weight: 600; text-align: right;
+      padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+      text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+    }
     thead th:first-child { text-align: left; }
     tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
-    tbody td { padding: 6px 8px; text-align: right; color: var(--text); }
-    tbody td:first-child { text-align: left; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tag-high { color: var(--red); font-weight: 600; }
-    .tag-pos { color: var(--green); }
-    .tag-neg { color: var(--red); }
+    tbody tr:hover { background: #1e2535; }
+    tbody td { padding: 9px 12px; text-align: right; color: var(--text); white-space: nowrap; }
+    tbody td:first-child { text-align: left; font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .rate-cell { color: var(--accent2); }
+    .revenue-cell { color: var(--warning); font-weight: 600; }
+    .reject-cell { color: var(--danger); }
+    .dash { color: var(--muted); }
+    .loading-row td { text-align: center; color: var(--muted); padding: 40px; }
 
-    /* ---- Double Table ---- */
-    .double-table { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .sub-table-title { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
 
-    /* ---- Click Compare ---- */
-    .click-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .click-col { background: var(--surface2); border-radius: 8px; padding: 12px; }
-    .click-col-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-    .click-metric { margin-bottom: 6px; }
-    .click-metric label { font-size: 10px; color: var(--dim); display: block; }
-    .click-metric .v { font-size: 16px; font-weight: 700; }
-    .click-diff-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
-
-    /* ---- Top App List ---- */
-    .app-list { display: flex; flex-direction: column; gap: 6px; }
-    .app-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border-radius: 6px; padding: 8px 10px; }
-    .app-rank { font-size: 11px; color: var(--dim); font-weight: 700; width: 20px; flex-shrink: 0; }
-    .app-name { font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 8px; }
-    .app-rev { font-size: 13px; font-weight: 700; color: var(--green); flex-shrink: 0; }
-
-    /* ---- Scrollbar ---- */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } .card-wide { grid-column: span 2; } }
-    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .card-wide, .card-full { grid-column: span 1; } .double-table, .click-compare { grid-template-columns: 1fr; } }
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .filter-row, .pull-row { flex-direction: column; }
+      .pull-input { width: 100%; }
+    }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="header-left">
-    <div class="logo">🦞</div>
-    <div class="header-title">
-      <h1>Openclaw DQC 数据质量巡检看板</h1>
-      <p>VibeWave · 海外移动互联网广告投放 AI 工作站</p>
+  <h1>APPID 数据看板</h1>
+  <span class="badge">UTC+0</span>
+  <span id="last-update" style="margin-left:auto;color:var(--muted);font-size:11px;"></span>
+  <button class="btn btn-secondary" onclick="showApiConfig()" style="font-size:11px;padding:5px 10px;margin-left:12px">⚙ API 地址</button>
+</div>
+
+<!-- API 地址配置弹窗 -->
+<div id="api-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:480px;max-width:90vw">
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px">⚙ 后端 API 地址配置</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:12px">填入 ngrok 公网 HTTPS 地址，用于 GitHub Pages 访问本地后端</div>
+    <input type="text" id="api-base-input" style="width:100%;margin-bottom:12px" placeholder="https://xxxx.ngrok-free.app" />
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeApiConfig()">取消</button>
+      <button class="btn btn-primary" onclick="saveApiConfig()">保存并刷新</button>
     </div>
   </div>
-  <div class="header-meta">
-    <div class="badge" id="reportBadge">MORNING</div>
-    <div class="meta-info" id="reportMeta"></div>
+</div>
+
+<div class="container">
+
+  <!-- ── 顶部筛选区 ── -->
+  <div class="section">
+    <div class="section-title">筛选条件（影响看板展示）</div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>开始日期（UTC+0）</label>
+        <input type="date" id="filter-start" />
+      </div>
+      <div class="filter-group">
+        <label>结束日期（UTC+0）</label>
+        <input type="date" id="filter-end" />
+      </div>
+      <div class="filter-group">
+        <label>快捷选择</label>
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="setQuick(1)">昨天</button>
+          <button class="quick-btn" onclick="setQuick(3)">近3天</button>
+          <button class="quick-btn active" onclick="setQuick(7)">近7天</button>
+          <button class="quick-btn" onclick="setQuick(15)">近15天</button>
+        </div>
+      </div>
+      <div class="filter-group" style="flex: 2;">
+        <label>APPID（输入框，多个用逗号分隔）</label>
+        <input type="text" id="appid-input" placeholder="例如: 1436799971,com.binance.dev" style="width: 100%;" />
+        <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+          当前支持: <span id="available-appids-list">1436799971, com.binance.dev</span>
+        </div>
+      </div>
+      <div class="filter-group" style="justify-content:flex-end">
+        <button class="btn btn-primary" onclick="loadAllPanels()">刷新看板</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 拉取触发区 ── -->
+  <div class="section">
+    <div class="section-title">触发数据拉取</div>
+    <div class="pull-row">
+      <div class="filter-group">
+        <label>APPID（多个用英文逗号分隔）</label>
+        <input type="text" id="pull-appids" class="pull-input" placeholder="com.app1, com.app2" />
+      </div>
+      <div class="filter-group">
+        <label>开始日期</label>
+        <input type="date" id="pull-start" />
+      </div>
+      <div class="filter-group">
+        <label>结束日期</label>
+        <input type="date" id="pull-end" />
+      </div>
+      <div class="filter-group">
+        <label>快捷</label>
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="setPullQuick(3)">近3天</button>
+          <button class="quick-btn active" onclick="setPullQuick(7)">近7天</button>
+          <button class="quick-btn" onclick="setPullQuick(15)">近15天</button>
+        </div>
+      </div>
+      <div class="filter-group" style="justify-content:flex-end">
+        <div class="checkbox-wrap" style="margin-bottom:8px">
+          <input type="checkbox" id="scheduled-check" />
+          <label for="scheduled-check">定期拉取（每日 UTC+0 02:00 自动拉取昨日数据）</label>
+        </div>
+        <button class="btn btn-primary" id="pull-btn" onclick="triggerPull()">开始拉取</button>
+      </div>
+    </div>
+    <div class="status-bar" id="pull-status"></div>
+  </div>
+
+  <!-- ── 看板区 ── -->
+  <div id="panels">
+
+    <!-- 看板1：综合数据 -->
+    <div class="section">
+      <div class="section-title">综合数据看板（维度：APPID / prod）</div>
+      <div class="table-wrap" id="panel-overview"></div>
+    </div>
+
+    <!-- 看板2：PRT / PID / PRT+PID -->
+    <div class="section">
+      <div class="section-title">渠道维度看板</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('prt', this)">PRT</div>
+        <div class="tab" onclick="switchTab('pid', this)">PID</div>
+        <div class="tab" onclick="switchTab('prt_pid', this)">PRT + PID</div>
+      </div>
+      <div class="table-wrap" id="panel-prt"></div>
+      <div class="table-wrap" id="panel-pid" style="display:none"></div>
+      <div class="table-wrap" id="panel-prt_pid" style="display:none"></div>
+    </div>
+
+    <!-- 看板3：Affiliate -->
+    <div class="section">
+      <div class="section-title">Affiliate 表现看板</div>
+      <div class="table-wrap" id="panel-affiliate"></div>
+    </div>
+
+    <!-- 看板4：GEOs -->
+    <div class="section">
+      <div class="section-title">GEOs 表现看板</div>
+      <div class="table-wrap" id="panel-geo"></div>
+    </div>
+
+    <!-- 看板5：AM -->
+    <div class="section">
+      <div class="section-title">AM 表现看板</div>
+      <div class="table-wrap" id="panel-am"></div>
+    </div>
+
   </div>
 </div>
 
-<div class="status-bar">
-  <div class="dot" id="statusDot"></div>
-  <strong id="statusText">系统运行正常</strong>
-  <span style="color:var(--dim)">·</span>
-  <span id="statusDetail" style="color:var(--muted)"></span>
-</div>
-
-<div class="grid" id="grid"></div>
-
 <script>
-const REPORT = {"report_title": "海外移动互联网广告投放AI工作站 - Evening数据质量巡检报告", "report_time_beijing": "2026-03-12 22:01:27", "report_date": "2026-03-12", "yesterday": "2026-03-11", "day_before": "2026-03-10", "report_type": "evening", "cards": [{"id": "revenue_by_date", "title": "核心收入对比 (Revenue by Date)", "yesterday": "$7,317.22", "day_before": "$7,340.65", "diff": "$-23.44", "diff_pct": "-0.3%", "is_positive": false}, {"id": "recent_revenue_trends", "title": "近期收入趋势 (Recent Revenue Trends)", "type": "line_chart", "data": {"labels": ["2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12"], "datasets": [{"label": "收入 (USD)", "data": [6481.76, 7017.28, 5935.23, 18366.1, 7340.65, 7317.22, 3907.91]}]}}, {"id": "revenue_by_am", "title": "按 AM 收入对比 (Revenue by AM)", "type": "table", "rows": [{"source_manager": "Angelica", "yesterday": 3726.72, "day_before": 3065.68, "diff": 661.04, "is_positive": true}, {"source_manager": "helin", "yesterday": 917.57, "day_before": 1346.01, "diff": -428.44, "is_positive": false}, {"source_manager": "Phoebe", "yesterday": 781.5, "day_before": 1205.72, "diff": -424.23, "is_positive": false}, {"source_manager": "Ria", "yesterday": 614.95, "day_before": 428.45, "diff": 186.5, "is_positive": true}, {"source_manager": "Hedy", "yesterday": 614.46, "day_before": 608.43, "diff": 6.03, "is_positive": true}, {"source_manager": "Claire", "yesterday": 480.0, "day_before": 616.85, "diff": -136.85, "is_positive": false}, {"source_manager": "Sylva", "yesterday": 90.0, "day_before": 6.1, "diff": 83.9, "is_positive": true}, {"source_manager": "Chloe", "yesterday": 89.62, "day_before": 63.41, "diff": 26.21, "is_positive": true}, {"source_manager": "Lisa", "yesterday": 2.4, "day_before": 0, "diff": 2.4, "is_positive": true}, {"source_manager": "SylvaMaster", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Serena", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Mia", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Angie", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}, {"source_manager": "Allen", "yesterday": 0, "day_before": 0, "diff": 0, "is_positive": true}]}, {"id": "revenue_by_prt", "title": "昨日 Top Revenue PRT (Top 20)", "type": "table", "rows": [{"prt": "entravision", "revenue": 1903.0}, {"prt": "webmediail626", "revenue": 1254.0}, {"prt": "ampli", "revenue": 474.1}, {"prt": "adperiomedia", "revenue": 436.0}, {"prt": "automatetein453", "revenue": 254.47}, {"prt": "betperformbr265", "revenue": 244.75}, {"prt": "lychee", "revenue": 217.5}, {"prt": "quantumadssg892", "revenue": 197.7}, {"prt": "okjoy", "revenue": 183.95}, {"prt": "vibewavesg815", "revenue": 169.5}, {"prt": "grovelinkus425", "revenue": 137.8}, {"prt": "Tapcash", "revenue": 134.2}, {"prt": "cuboappbr", "revenue": 65.15}, {"prt": "cchangetech", "revenue": 61.6}, {"prt": "zilmtech", "revenue": 60.0}, {"prt": "yolomedia", "revenue": 52.5}, {"prt": "feeltapmedia", "revenue": 51.99}, {"prt": "txcxnetcn391", "revenue": 43.77}, {"prt": "jslxtadshk828", "revenue": 42.3}, {"prt": "waveadstecaw511", "revenue": 41.45}]}, {"id": "adv_am_app_top10", "title": "核心维度 Top 10 升降榜 (ADV + AM + APP)", "type": "double_table", "increase": [{"dimension": "Riseupads / Angelica / 1531467766 (ViX: TV, Sports an..)", "yesterday": 1886.0, "day_before": 296.0, "diff": 1590.0, "pct": 537.2}, {"dimension": "olamob / helin / 1395667279 (FloatMe: Fast Cash..)", "yesterday": 436.0, "day_before": 199.0, "diff": 237.0, "pct": 119.1}, {"dimension": "Rocket Lab-ria / Ria / 1531467766 (ViX: TV, Sports an..)", "yesterday": 180.0, "day_before": 32.0, "diff": 148.0, "pct": 462.5}, {"dimension": "Bybit / Sylva / 1488296980 (Bybit: Buy &amp; T..)", "yesterday": 80.0, "day_before": 0, "diff": 80.0, "pct": 100.0}, {"dimension": "Zype-Ria / Ria / com.anytimerupee (Anytime Rupee)", "yesterday": 71.1, "day_before": 2.25, "diff": 68.85, "pct": 3060.0}, {"dimension": "Growth Genius / Hedy / com.picpay (PicPay: cartão, co..)", "yesterday": 74.3, "day_before": 18.6, "diff": 55.7, "pct": 299.5}, {"dimension": "Power Up Money-Ria / Ria / money.powerup.uni.invest.app (PowerUp Money- Mut..)", "yesterday": 83.2, "day_before": 37.7, "diff": 45.5, "pct": 120.7}, {"dimension": "Cubo / Angelica / br.bet.vera.twa.apk", "yesterday": 60.5, "day_before": 19.25, "diff": 41.25, "pct": 214.3}, {"dimension": "adstacks / Hedy / com.anytimerupee (Anytime Rupee)", "yesterday": 38.1, "day_before": 0, "diff": 38.1, "pct": 100.0}, {"dimension": "TOP-BEAT / helin / 1531467766 (ViX: TV, Sports an..)", "yesterday": 37.5, "day_before": 0, "diff": 37.5, "pct": 100.0}], "decrease": [{"dimension": "Mobupps / Angelica / 1564391515 (App Store)", "yesterday": 901.0, "day_before": 1890.0, "diff": -989.0, "pct": -52.3}, {"dimension": "Feeltap / helin / 387682726 (Taobao)", "yesterday": 51.99, "day_before": 821.12, "diff": -769.13, "pct": -93.7}, {"dimension": "mobisummer--api / Phoebe / 1589643727 (Solitaire Clash: W..)", "yesterday": 0, "day_before": 240.0, "diff": -240.0, "pct": -100.0}, {"dimension": "mobisummer--api / Claire / 1589643727 (Solitaire Clash: W..)", "yesterday": 480.0, "day_before": 600.0, "diff": -120.0, "pct": -20.0}, {"dimension": "Farly-Ria / Ria / 1395667279 (FloatMe: Fast Cash..)", "yesterday": 0, "day_before": 98.0, "diff": -98.0, "pct": -100.0}, {"dimension": "AutomateTech / Phoebe / com.zalora.android (ZALORA-Online Fash..)", "yesterday": 75.15, "day_before": 158.65, "diff": -83.5, "pct": -52.6}, {"dimension": "Mobupps / Angelica / 6499306806 (Goods Triple Match..)", "yesterday": 162.0, "day_before": 205.0, "diff": -43.0, "pct": -21.0}, {"dimension": "mobisummer / Phoebe / 6689516366 (Bus Escape: Traffi..)", "yesterday": 10.82, "day_before": 51.58, "diff": -40.76, "pct": -79.0}, {"dimension": "Thrillzz Social Fun Sportsbook / Angelica / 6499589754 (Thrillzz Fun Socia..)", "yesterday": 10.0, "day_before": 50.0, "diff": -40.0, "pct": -80.0}, {"dimension": "clickorbits / Hedy / ru.moneyman (MoneyMan - Займы о..)", "yesterday": 0, "day_before": 35.0, "diff": -35.0, "pct": -100.0}]}, {"id": "top_app", "title": "Top 收入/安装 APP", "type": "double_table", "top_revenue": [{"prod": "1531467766", "app_name": "ViX: TV, Sports an..", "yesterday": 2103.5, "day_before": 335.0, "diff": 1768.5}, {"prod": "1564391515", "app_name": "App Store", "yesterday": 901.0, "day_before": 1890.0, "diff": -989.0}, {"prod": "1589643727", "app_name": "Solitaire Clash: W..", "yesterday": 480.0, "day_before": 840.0, "diff": -360.0}, {"prod": "1395667279", "app_name": "FloatMe: Fast Cash..", "yesterday": 436.0, "day_before": 297.0, "diff": 139.0}, {"prod": "1074347205", "app_name": "Beep Saúde", "yesterday": 361.25, "day_before": 355.0, "diff": 6.25}], "top_install": [{"prod": "1531467766", "app_name": "ViX: TV, Sports an..", "yesterday": 258141, "day_before": 295597, "diff": -37456}, {"prod": "com.picpay", "app_name": "PicPay: cartão, co..", "yesterday": 16374, "day_before": 6157, "diff": 10217}, {"prod": "live.shorttv.apps", "app_name": "ShortMax - Watch D..", "yesterday": 5856, "day_before": 5759, "diff": 97}, {"prod": "org.melbet.client-Custom", "app_name": "org.melbet.client-Custom", "yesterday": 3005, "day_before": 2922, "diff": 83}, {"prod": "ph.atome.paylater", "app_name": "Atome PH - Buy Now..", "yesterday": 2853, "day_before": 184, "diff": 2669}, {"prod": "cassino.bet.br.twa", "app_name": "cassino.bet.br.twa", "yesterday": 2747, "day_before": 1789, "diff": 958}, {"prod": "com.zalora.android", "app_name": "ZALORA-Online Fash..", "yesterday": 2660, "day_before": 2600, "diff": 60}, {"prod": "com.licious", "app_name": "Licious - Chicken,..", "yesterday": 2327, "day_before": 2062, "diff": 265}, {"prod": "br.bet.k.twa", "app_name": "br.bet.k.twa", "yesterday": 2184, "day_before": 1881, "diff": 303}, {"prod": "6464002625", "app_name": "ShortTV - Watch Dr..", "yesterday": 2037, "day_before": 1569, "diff": 468}]}, {"id": "fraud_by_country", "title": "国家维度作弊 Top 10 (Yesterday)", "type": "table", "rows": [{"country": "PH", "reject_install": 6153, "true_install": 5790, "reject_rate": "51.5%", "is_high": true}, {"country": "MX", "reject_install": 5651, "true_install": 171174, "reject_rate": "3.2%", "is_high": false}, {"country": "BR", "reject_install": 1601, "true_install": 29275, "reject_rate": "5.2%", "is_high": false}, {"country": "US", "reject_install": 1253, "true_install": 91602, "reject_rate": "1.3%", "is_high": false}, {"country": "IN", "reject_install": 576, "true_install": 13030, "reject_rate": "4.2%", "is_high": false}, {"country": "ID", "reject_install": 255, "true_install": 6216, "reject_rate": "3.9%", "is_high": false}, {"country": "VN", "reject_install": 158, "true_install": 2427, "reject_rate": "6.1%", "is_high": false}, {"country": "EG", "reject_install": 152, "true_install": 753, "reject_rate": "16.8%", "is_high": false}, {"country": "MY", "reject_install": 124, "true_install": 1221, "reject_rate": "9.2%", "is_high": false}, {"country": "TW", "reject_install": 90, "true_install": 110, "reject_rate": "45.0%", "is_high": true}]}, {"id": "track_source_click", "title": "核心点击数据对比 (Track Source Click)", "yesterday": {"total_clicks": 5698383200, "success_clicks": 4590163455, "success_rate": "80.6%"}, "day_before": {"total_clicks": 6156575847, "success_clicks": 5041848280, "success_rate": "81.9%"}, "sc_diff_yi": "-4.52 亿", "sc_is_positive": false}, {"id": "app_tracksource_click", "title": "APP 维度点击 Top 30 (成功率<50%, 按成功点击数倒序)", "type": "table", "rows": [{"app_name": "864027750", "total_clicks": 130939603, "success_clicks": 58140452, "success_rate": "44.4%"}, {"app_name": "1359763701", "total_clicks": 105542873, "success_clicks": 44062228, "success_rate": "41.7%"}, {"app_name": "1494156956", "total_clicks": 28829611, "success_clicks": 14078636, "success_rate": "48.8%"}, {"app_name": "1539188123", "total_clicks": 21509354, "success_clicks": 10220626, "success_rate": "47.5%"}, {"app_name": "1450304211", "total_clicks": 17696005, "success_clicks": 7002468, "success_rate": "39.6%"}, {"app_name": "com.mexicash.app", "total_clicks": 19204237, "success_clicks": 5689276, "success_rate": "29.6%"}, {"app_name": "org.betwinner.client-Custom", "total_clicks": 10996449, "success_clicks": 5158813, "success_rate": "46.9%"}, {"app_name": "6443722306", "total_clicks": 10521096, "success_clicks": 3631689, "success_rate": "34.5%"}, {"app_name": "com.yoverse.app", "total_clicks": 9675583, "success_clicks": 3487337, "success_rate": "36.0%"}, {"app_name": "com.mpokket.app", "total_clicks": 14466511, "success_clicks": 3374233, "success_rate": "23.3%"}, {"app_name": "1578659665", "total_clicks": 7331758, "success_clicks": 3204022, "success_rate": "43.7%"}, {"app_name": "1459081967", "total_clicks": 63200234, "success_clicks": 2996785, "success_rate": "4.7%"}, {"app_name": "1628527622", "total_clicks": 8809332, "success_clicks": 2988213, "success_rate": "33.9%"}, {"app_name": "com.elaworld.mexloan", "total_clicks": 6492252, "success_clicks": 2985812, "success_rate": "46.0%"}, {"app_name": "com.fintopia.mxcredmex", "total_clicks": 6304777, "success_clicks": 2763061, "success_rate": "43.8%"}, {"app_name": "ru.migcredit.migcredit2", "total_clicks": 4637222, "success_clicks": 2207706, "success_rate": "47.6%"}, {"app_name": "6444538603", "total_clicks": 4309699, "success_clicks": 1766100, "success_rate": "41.0%"}, {"app_name": "com.xfr.xtrade", "total_clicks": 3846287, "success_clicks": 1707847, "success_rate": "44.4%"}, {"app_name": "6476564713", "total_clicks": 4571174, "success_clicks": 1601169, "success_rate": "35.0%"}, {"app_name": "com.samsungar.shop", "total_clicks": 4749275, "success_clicks": 1580907, "success_rate": "33.3%"}, {"app_name": "1205807363", "total_clicks": 4036624, "success_clicks": 1399388, "success_rate": "34.7%"}, {"app_name": "1104692136", "total_clicks": 8391807, "success_clicks": 1098801, "success_rate": "13.1%"}, {"app_name": "com.octainvest", "total_clicks": 2260474, "success_clicks": 1086401, "success_rate": "48.1%"}, {"app_name": "1533642823", "total_clicks": 2783695, "success_clicks": 985836, "success_rate": "35.4%"}, {"app_name": "6599838025", "total_clicks": 2483326, "success_clicks": 819145, "success_rate": "33.0%"}, {"app_name": "1140130413", "total_clicks": 2040045, "success_clicks": 818102, "success_rate": "40.1%"}, {"app_name": "1101145849", "total_clicks": 2746256, "success_clicks": 746167, "success_rate": "27.2%"}, {"app_name": "1457956232", "total_clicks": 10969610, "success_clicks": 635903, "success_rate": "5.8%"}, {"app_name": "6451312745", "total_clicks": 1557558, "success_clicks": 633260, "success_rate": "40.7%"}, {"app_name": "com.walbi.android", "total_clicks": 1605998, "success_clicks": 630851, "success_rate": "39.3%"}]}, {"id": "today_revenue", "title": "今日收入进度 (截至 UTC 13:00)", "today": "$3,907.91", "yesterday_same": "$2,805.93", "diff": "+$1,101.98", "diff_pct": "+39.3%", "is_positive": true, "cutoff_hour": 13}, {"id": "today_top_app", "title": "今日 Top 5 APP (Today Top APP)", "type": "list", "items": [{"prod": "1589643727", "app_name": "Solitaire Clash: W..", "revenue": 690.0}, {"prod": "1531467766", "app_name": "ViX: TV, Sports an..", "revenue": 681.5}, {"prod": "1564391515", "app_name": "App Store", "revenue": 306.5}, {"prod": "1395667279", "app_name": "FloatMe: Fast Cash..", "revenue": 213.0}, {"prod": "com.anytimerupee", "app_name": "Anytime Rupee", "revenue": 129.42}]}, {"id": "today_rejection", "title": "今日作弊情况 (Today Rejection by Country Top 10)", "type": "table", "rows": [{"country": "PH", "reject_install": 3788, "true_install": 4836, "reject_rate": "43.9%", "is_high": true}, {"country": "MX", "reject_install": 1495, "true_install": 92055, "reject_rate": "1.6%", "is_high": false}, {"country": "BR", "reject_install": 1000, "true_install": 19313, "reject_rate": "4.9%", "is_high": false}, {"country": "IN", "reject_install": 390, "true_install": 9080, "reject_rate": "4.1%", "is_high": false}, {"country": "US", "reject_install": 302, "true_install": 29069, "reject_rate": "1.0%", "is_high": false}, {"country": "ID", "reject_install": 162, "true_install": 3921, "reject_rate": "4.0%", "is_high": false}, {"country": "MA", "reject_install": 97, "true_install": 55, "reject_rate": "63.8%", "is_high": true}, {"country": "EG", "reject_install": 93, "true_install": 336, "reject_rate": "21.7%", "is_high": false}, {"country": "RU", "reject_install": 74, "true_install": 977, "reject_rate": "7.0%", "is_high": false}, {"country": "VN", "reject_install": 59, "true_install": 1043, "reject_rate": "5.4%", "is_high": false}]}, {"id": "today_app_diff", "title": "今日 APP 收入增降幅 Top2 (截至 UTC 13:00)", "increase": [{"prod": "1531467766", "app_name": "ViX: TV, Sports an..", "today": 681.5, "yesterday_same": 0, "diff": 681.5, "diff_pct": 100.0, "is_positive": true}, {"prod": "1589643727", "app_name": "Solitaire Clash: W..", "today": 690.0, "yesterday_same": 150.0, "diff": 540.0, "diff_pct": 360.0, "is_positive": true}], "decrease": [{"prod": "1564391515", "app_name": "App Store", "today": 306.5, "yesterday_same": 609.0, "diff": -302.5, "diff_pct": -49.7, "is_positive": false}, {"prod": "money.powerup.uni.invest.app", "app_name": "PowerUp Money- Mut..", "today": 11.05, "yesterday_same": 81.05, "diff": -70.0, "diff_pct": -86.4, "is_positive": false}]}], "last_update_beijing": "2026-03-12 22:01:27", "inserted_count": 0};
-const COLORS = ["#58a6ff", "#3fb950", "#ffa657", "#d2a8ff", "#f78166", "#79c0ff", "#56d364", "#e3b341", "#bc8cff", "#ff7b72"];
-
-function fmt(n) { return typeof n === 'number' ? n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : (n || '--'); }
-function fmtInt(n) { return typeof n === 'number' ? n.toLocaleString('en-US') : (n || '--'); }
-
-function card(cls, accentColor) {
-  var e = document.createElement('div');
-  e.className = 'card' + (cls ? ' ' + cls : '');
-  if (accentColor) e.style.setProperty('--card-accent', accentColor);
-  return e;
+// ── 配置 ──────────────────────────────────────────────────────────────────────
+// API_BASE 优先从 URL 参数读取，其次从 localStorage 读取，最后回退到 localhost
+// 示例: index.html?api=https://xxxx.ngrok-free.app
+const urlParams = new URLSearchParams(window.location.search);
+const savedBase = localStorage.getItem('appid_api_base');
+let API_BASE = urlParams.get('api') || savedBase || 'http://localhost:5050';
+if (urlParams.get('api')) {
+  localStorage.setItem('appid_api_base', API_BASE);
+  // 清除 URL 参数，保持地址干净
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
 }
 
-function section(label) {
-  var e = document.createElement('div');
-  e.className = 'section';
-  e.innerHTML = '<div class="section-line"></div><div class="section-label">' + label + '</div><div class="section-line"></div>';
-  return e;
+// ── 日期工具 ──────────────────────────────────────────────────────────────────
+function utcDateStr(offsetDays = 0) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
 }
 
-function renderAll() {
-  var g = document.getElementById('grid');
-  g.innerHTML = '';
+function setQuick(days) {
+  document.querySelectorAll('.filter-row .quick-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const end = utcDateStr(-1);
+  const start = utcDateStr(-(days));
+  document.getElementById('filter-start').value = start;
+  document.getElementById('filter-end').value = end;
+}
 
-  // Header meta
-  var m = REPORT.report_title.match(/(morning|afternoon|evening)/i);
-  document.getElementById('reportBadge').textContent = m ? m[0].toUpperCase() : 'REPORT';
-  document.getElementById('reportMeta').textContent = '生成时间：' + REPORT.report_time_beijing + '（北京时间）  |  Yesterday: ' + REPORT.yesterday + '  DayBefore: ' + REPORT.day_before;
-  document.getElementById('statusDetail').textContent = '最后更新：' + (REPORT.last_update_beijing || '--') + '  ·  本次采集新增 ' + (REPORT.inserted_count || 0) + ' 条';
+function setPullQuick(days) {
+  document.querySelectorAll('.pull-row .quick-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const end = utcDateStr(-1);
+  const start = utcDateStr(-(days));
+  document.getElementById('pull-start').value = start;
+  document.getElementById('pull-end').value = end;
+}
 
-  var cards = {};
-  REPORT.cards.forEach(function(c) { cards[c.id] = c; });
+// ── 初始化默认日期 ────────────────────────────────────────────────────────────
+(function initDates() {
+  const end = utcDateStr(-1);
+  const start = utcDateStr(-7);
+  document.getElementById('filter-start').value = start;
+  document.getElementById('filter-end').value = end;
+  document.getElementById('pull-start').value = start;
+  document.getElementById('pull-end').value = end;
+})();
 
-  // ── Section A: 收入巡检 ──────────────────────────────────────────────
-  g.appendChild(section('A · 收入巡检 (Revenue)'));
+// ── APPID 管理 ────────────────────────────────────────────────────────────────
+let availableAppids = ['1436799971', 'com.binance.dev'];
 
-  // Card 1: Revenue by Date
-  var c1 = cards['revenue_by_date'];
-  if (c1) {
-    var e1 = card('card-wide', '#58a6ff');
-    var isPos1 = c1.is_positive;
-    e1.innerHTML = '<div class="card-icon">💰</div><div class="card-title">' + c1.title + '</div>' +
-      '<div class="compare-grid">' +
-        '<div class="compare-item"><label>Yesterday (' + REPORT.yesterday + ')</label><div class="val" style="color:var(--accent)">' + c1.yesterday + '</div></div>' +
-        '<div class="compare-item"><label>DayBefore (' + REPORT.day_before + ')</label><div class="val">' + c1.day_before + '</div></div>' +
-      '</div>' +
-      '<div class="diff-row"><span class="diff-val ' + (isPos1?'pos':'neg') + '">' + c1.diff + '</span><span class="diff-pct">' + c1.diff_pct + '</span></div>';
-    g.appendChild(e1);
+// 页面加载时更新可用APPID列表显示
+function updateAvailableAppidsDisplay() {
+  const displayElement = document.getElementById('available-appids-list');
+  if (displayElement) {
+    displayElement.textContent = availableAppids.join(', ');
+  }
+}
+
+// 初始化
+updateAvailableAppidsDisplay();
+
+// ── 表格渲染 ──────────────────────────────────────────────────────────────────
+const PANEL_COLS = {
+  overview:  { dim: 'prod',           label: 'APPID (prod)' },
+  prt:       { dim: 'prt',            label: 'PRT' },
+  pid:       { dim: 'pid',            label: 'PID' },
+  prt_pid:   { dim: 'prt_pid',        label: 'PRT + PID' },
+  affiliate: { dim: 'affiliate_id',   label: 'Affiliate ID' },
+  geo:       { dim: 'country',        label: 'Country' },
+  am:        { dim: 'source_manager', label: 'AM' },
+};
+
+function fmt(v, type='num') {
+  if (v === null || v === undefined) return '<span class="dash">—</span>';
+  if (type === 'rate') return `<span class="rate-cell">${v}%</span>`;
+  if (type === 'revenue') return `<span class="revenue-cell">$${Number(v).toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>`;
+  if (type === 'reject') return `<span class="reject-cell">${Number(v).toLocaleString()}</span>`;
+  return Number(v).toLocaleString();
+}
+
+function renderTable(containerId, panel, rows) {
+  const cfg = PANEL_COLS[panel];
+  const hasAffiliateName = panel === 'affiliate';
+  const headers = [
+    cfg.label,
+    'Total Clicks', 'TS Total Clicks', 'Task Rate',
+    'TS Success Clicks', 'Success Rate',
+    'Installs', 'CR',
+    'Events', 'ER',
+    'Revenue',
+    'Rejected Installs', 'Fraud Rate',
+  ];
+  if (hasAffiliateName) headers.splice(1, 0, 'Affiliate Name');
+
+  const thead = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`;
+
+  if (!rows || rows.length === 0) {
+    document.getElementById(containerId).innerHTML =
+      `<table>${thead}<tbody><tr class="loading-row"><td colspan="${headers.length}">暂无数据</td></tr></tbody></table>`;
+    return;
   }
 
-  // Card 2: Revenue Trends (line chart)
-  var c2 = cards['recent_revenue_trends'];
-  if (c2) {
-    var e2 = card('card-wide', '#58a6ff');
-    e2.innerHTML = '<div class="card-title">' + c2.title + '</div><div class="chart-wrap"><canvas id="trendChart"></canvas></div>';
-    g.appendChild(e2);
+  const tbody = rows.map(r => {
+    const dimVal = r[cfg.dim] || '—';
+    let cells = [
+      `<td title="${dimVal}">${dimVal}</td>`,
+    ];
+    if (hasAffiliateName) cells.push(`<td>${r.source_name || ''}</td>`);
+    cells = cells.concat([
+      `<td>${fmt(r.total_clicks)}</td>`,
+      `<td>${fmt(r.ts_total_clicks)}</td>`,
+      `<td>${fmt(r.task_rate, 'rate')}</td>`,
+      `<td>${fmt(r.ts_success_clicks)}</td>`,
+      `<td>${fmt(r.success_rate, 'rate')}</td>`,
+      `<td>${fmt(r.installs)}</td>`,
+      `<td>${fmt(r.cr, 'rate')}</td>`,
+      `<td>${fmt(r.events)}</td>`,
+      `<td>${fmt(r.er, 'rate')}</td>`,
+      `<td>${fmt(r.revenue, 'revenue')}</td>`,
+      `<td>${fmt(r.rejected_installs, 'reject')}</td>`,
+      `<td>${fmt(r.fraud_rate, 'rate')}</td>`,
+    ]);
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('');
+
+  document.getElementById(containerId).innerHTML =
+    `<table>${thead}<tbody>${tbody}</tbody></table>`;
+}
+
+function showLoading(containerId, panel) {
+  const cfg = PANEL_COLS[panel];
+  document.getElementById(containerId).innerHTML = `
+    <table>
+      <thead><tr><th>${cfg.label}</th><th colspan="12">...</th></tr></thead>
+      <tbody><tr class="loading-row"><td colspan="13"><span class="spinner"></span>加载中...</td></tr></tbody>
+    </table>`;
+}
+
+// ── 加载看板数据 ──────────────────────────────────────────────────────────────
+async function loadPanel(panel, containerId) {
+  showLoading(containerId, panel);
+  const start = document.getElementById('filter-start').value;
+  const end = document.getElementById('filter-end').value;
+  const appidInput = document.getElementById('appid-input').value.trim();
+  
+  // 如果输入框为空，使用所有可用APPID
+  const appids = appidInput || availableAppids.join(',');
+
+  try {
+    const url = `${API_BASE}/api/dashboard?panel=${panel}&start_date=${start}&end_date=${end}&appids=${encodeURIComponent(appids)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    renderTable(containerId, panel, data.data || []);
+  } catch(e) {
+    document.getElementById(containerId).innerHTML =
+      `<div style="color:var(--danger);padding:20px">加载失败: ${e.message}<br>请确认后端服务已启动（python3 backend/app.py）</div>`;
   }
+}
 
-  // Card 3: Revenue by AM
-  var c3 = cards['revenue_by_am'];
-  if (c3) {
-    var e3 = card('card-wide', '#d2a8ff');
-    e3.innerHTML = '<div class="card-title">' + c3.title + '</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>AM</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
-      (c3.rows || []).map(function(r) {
-        return '<tr><td>' + r.source_manager + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + (r.is_positive?'tag-pos':'tag-neg') + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td></tr>';
-      }).join('') +
-      '</tbody></table></div>';
-    g.appendChild(e3);
+async function loadAllPanels() {
+  // APPID已硬编码，无需从API加载
+  const panels = [
+    ['overview', 'panel-overview'],
+    ['prt', 'panel-prt'],
+    ['pid', 'panel-pid'],
+    ['prt_pid', 'panel-prt_pid'],
+    ['affiliate', 'panel-affiliate'],
+    ['geo', 'panel-geo'],
+    ['am', 'panel-am'],
+  ];
+  for (const [panel, id] of panels) {
+    await loadPanel(panel, id);
   }
+  document.getElementById('last-update').textContent = '最后更新: ' + new Date().toLocaleTimeString();
+}
 
-  // Card 3b: Top Revenue PRT List
-  var c3b = cards['revenue_by_prt'];
-  if (c3b) {
-    var e3b = card('card-wide', '#79c0ff');
-    e3b.innerHTML = '<div class="card-title">' + c3b.title + '</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>PRT</th><th>Revenue (Yesterday)</th></tr></thead><tbody>' +
-      (c3b.rows || []).map(function(r, i) {
-        return '<tr><td>' + (i+1) + '. ' + r.prt + '</td><td>$' + fmt(r.revenue) + '</td></tr>';
-      }).join('') +
-      '</tbody></table></div>';
-    g.appendChild(e3b);
-  }
-
-  // Card 4: ADV+AM+APP Top10
-  var c4 = cards['adv_am_app_top10'];
-  if (c4) {
-    var e4 = card('card-full', '#ffa657');
-    e4.innerHTML = '<div class="card-title">' + c4.title + '</div>' +
-      '<div class="double-table">' +
-        '<div><div class="sub-table-title" style="color:var(--green)">🔺 增长 Top 10</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>维度 (ADV / AM / APP)</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
-        (c4.increase || []).map(function(r) {
-          return '<tr><td title="' + r.dimension + '">' + r.dimension + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="tag-pos">+$' + fmt(r.diff) + '</td><td class="tag-pos">+' + r.pct + '%</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
-        '<div><div class="sub-table-title" style="color:var(--red)">🔻 下降 Top 10</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>维度 (ADV / AM / APP)</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
-        (c4.decrease || []).map(function(r) {
-          return '<tr><td title="' + r.dimension + '">' + r.dimension + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="tag-neg">$' + fmt(r.diff) + '</td><td class="tag-neg">' + r.pct + '%</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
-      '</div>';
-    g.appendChild(e4);
-  }
-
-  // Card 5: Top Revenue APP + Top Install APP
-  var c5 = cards['top_app'];
-  if (c5) {
-    var e5 = card('card-full', '#56d364');
-    e5.innerHTML = '<div class="card-title">' + c5.title + '</div>' +
-      '<div class="double-table">' +
-        '<div><div class="sub-table-title">Top 5 收入 APP</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
-        (c5.top_revenue || []).map(function(r) {
-          var _lbl5a=(function(){var _p=r.prod||'--',_n=r.app_name||'';if(_n&&_n!==_p){var _s=_n.length>20?_n.substring(0,18)+'..':_n;return _p+' ('+_s+')';}return _p;})(); return '<tr><td title="'+( r.app_name||r.prod||'')+'">'+_lbl5a+'</td><td>$'+fmt(r.yesterday)+'</td><td>$'+fmt(r.day_before)+'</td><td class="'+(r.diff>=0?'tag-pos':'tag-neg')+'">'+(r.diff>=0?'+':'')+'$'+fmt(r.diff)+'</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
-        '<div><div class="sub-table-title">Top 10 安装 APP</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
-        (c5.top_install || []).map(function(r) {
-          var _lbl5b=(function(){var _p=r.prod||'--',_n=r.app_name||'';if(_n&&_n!==_p){var _s=_n.length>20?_n.substring(0,18)+'..':_n;return _p+' ('+_s+')';}return _p;})(); return '<tr><td title="'+(r.app_name||r.prod||'')+'">'+_lbl5b+'</td><td>'+fmtInt(r.yesterday)+'</td><td>'+fmtInt(r.day_before)+'</td><td class="'+(r.diff>=0?'tag-pos':'tag-neg')+'">'+(r.diff>=0?'+':'')+fmtInt(r.diff)+'</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
-      '</div>';
-    g.appendChild(e5);
-  }
-
-  // ── Section B: 作弊巡检 ──────────────────────────────────────────────
-  g.appendChild(section('B · 作弊巡检 (Fraud)'));
-
-  // Card 6: Fraud by Country
-  var c6 = cards['fraud_by_country'];
-  if (c6) {
-    var e6 = card('card-wide', '#f78166');
-    e6.innerHTML = '<div class="card-icon">🚫</div><div class="card-title">' + c6.title + '</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>Country</th><th>Reject Install</th><th>True Install</th><th>Reject Rate</th></tr></thead><tbody>' +
-      (c6.rows || []).map(function(r) {
-        return '<tr><td>' + r.country + '</td><td>' + fmtInt(r.reject_install) + '</td><td>' + fmtInt(r.true_install) + '</td><td class="' + (r.is_high?'tag-high':'') + '">' + r.reject_rate + '</td></tr>';
-      }).join('') +
-      '</tbody></table></div>';
-    g.appendChild(e6);
-  }
-
-  // ── Section C: 点击巡检 ──────────────────────────────────────────────
-  g.appendChild(section('C · 点击巡检 (Click)'));
-
-  // Card 7: Track Source Click Compare
-  var c7 = cards['track_source_click'];
-  if (c7) {
-    var e7 = card('card-wide', '#ffa657');
-    e7.innerHTML = '<div class="card-icon">👆</div><div class="card-title">' + c7.title + '</div>' +
-      '<div class="click-compare">' +
-        '<div class="click-col">' +
-          '<div class="click-col-label">Yesterday (' + REPORT.yesterday + ')</div>' +
-          '<div class="click-metric"><label>Total Click</label><div class="v">' + fmtInt(c7.yesterday.total_clicks) + '</div></div>' +
-          '<div class="click-metric"><label>Success Click</label><div class="v" style="color:var(--green)">' + fmtInt(c7.yesterday.success_clicks) + '</div></div>' +
-          '<div class="click-metric"><label>Success Rate</label><div class="v">' + c7.yesterday.success_rate + '</div></div>' +
-        '</div>' +
-        '<div class="click-col">' +
-          '<div class="click-col-label">DayBefore (' + REPORT.day_before + ')</div>' +
-          '<div class="click-metric"><label>Total Click</label><div class="v">' + fmtInt(c7.day_before.total_clicks) + '</div></div>' +
-          '<div class="click-metric"><label>Success Click</label><div class="v" style="color:var(--muted)">' + fmtInt(c7.day_before.success_clicks) + '</div></div>' +
-          '<div class="click-metric"><label>Success Rate</label><div class="v">' + c7.day_before.success_rate + '</div></div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="click-diff-row">Success Click 变化：<span class="' + (c7.sc_is_positive?'pos':'neg') + '" style="font-weight:700">' + c7.sc_diff_yi + '</span></div>';
-    g.appendChild(e7);
-  }
-
-  // Card 8: APP TrackSource Click Top 30
-  var c8 = cards['app_tracksource_click'];
-  if (c8) {
-    var e8 = card('card-wide', '#79c0ff');
-    e8.innerHTML = '<div class="card-title">' + c8.title + '</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>App Name</th><th>Total Click</th><th>Success Click</th><th>Success Rate</th></tr></thead><tbody>' +
-      (c8.rows || []).map(function(r) {
-        return '<tr><td>' + (r.app_name || '--') + '</td><td>' + fmtInt(r.total_clicks) + '</td><td>' + fmtInt(r.success_clicks) + '</td><td>' + r.success_rate + '</td></tr>';
-      }).join('') +
-      '</tbody></table></div>';
-    g.appendChild(e8);
-  }
-
-  // ── Section D: 今日进度 ──────────────────────────────────────────────
-  g.appendChild(section('D · 今日进度 (Today Progress)'));
-
-  // Card 9: Today Revenue
-  var c9 = cards['today_revenue'];
-  if (c9) {
-    var e9 = card('card-wide', '#58a6ff');
-    var isPos9 = c9.is_positive;
-    e9.innerHTML = '<div class="card-icon">📈</div><div class="card-title">' + c9.title + '</div>' +
-      '<div class="compare-grid">' +
-        '<div class="compare-item"><label>今日累计</label><div class="val" style="color:var(--accent)">' + c9.today + '</div></div>' +
-        '<div class="compare-item"><label>昨日同期</label><div class="val">' + c9.yesterday_same + '</div></div>' +
-      '</div>' +
-      '<div class="diff-row"><span class="diff-val ' + (isPos9?'pos':'neg') + '">' + c9.diff + '</span><span class="diff-pct">' + c9.diff_pct + '</span></div>';
-    g.appendChild(e9);
-  }
-
-  // Card 10: Today Top APP
-  var c10 = cards['today_top_app'];
-  if (c10) {
-    var e10 = card(null, '#56d364');
-    e10.innerHTML = '<div class="card-icon">📱</div><div class="card-title">' + c10.title + '</div>' +
-      '<div class="app-list">' +
-      (c10.items || []).map(function(item, i) {
-        var _lbl10=(function(){var _p=item.prod||'--',_n=item.app_name||'';if(_n&&_n!==_p){var _s=_n.length>20?_n.substring(0,18)+'..':_n;return _p+' ('+_s+')';}return _p;})(); return '<div class="app-item"><span class="app-rank">#'+(i+1)+'</span><span class="app-name" title="'+(item.app_name||item.prod||'')+'">'+_lbl10+'</span><span class="app-rev">$'+fmt(item.revenue)+'</span></div>';
-      }).join('') +
-      '</div>';
-    g.appendChild(e10);
-  }
-
-  // Card 11: Today Rejection
-  var c11 = cards['today_rejection'];
-  if (c11) {
-    var e11 = card('card-wide', '#f78166');
-    e11.innerHTML = '<div class="card-icon">🚨</div><div class="card-title">' + c11.title + '</div>' +
-      '<div class="tbl-wrap"><table><thead><tr><th>Country</th><th>Reject Install</th><th>True Install</th><th>Reject Rate</th></tr></thead><tbody>' +
-      (c11.rows || []).map(function(r) {
-        return '<tr><td>' + r.country + '</td><td>' + fmtInt(r.reject_install) + '</td><td>' + fmtInt(r.true_install) + '</td><td class="' + (r.is_high?'tag-high':'') + '">' + r.reject_rate + '</td></tr>';
-      }).join('') +
-      '</tbody></table></div>';
-    g.appendChild(e11);
-  }
-
-
-  // Card 12: Today APP Revenue Diff (今日 APP 收入增降幅)
-  var c12 = cards['today_app_diff'];
-  if (c12) {
-    var e12 = card('card-full', '#d2a8ff');
-    var mkRow12 = function(r) {
-      var _p = r.prod || '--';
-      var _n = r.app_name || '';
-      var _lbl = (_n && _n !== _p) ? (_p + ' (' + (_n.length > 20 ? _n.substring(0,18)+'..' : _n) + ')') : _p;
-      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
-      return '<tr><td title="' + (_n||_p) + '">' + _lbl + '</td><td>$' + fmt(r.today) + '</td><td>$' + fmt(r.yesterday_same) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
-    };
-    e12.innerHTML = '<div class="card-title">' + c12.title + '</div>' +
-      '<div class="double-table">' +
-        '<div><div class="sub-table-title" style="color:var(--green)">🔺 今日收入增长 Top</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APP</th><th>Today</th><th>Yesterday Same</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
-        (c12.increase || []).map(mkRow12).join('') +
-        '</tbody></table></div></div>' +
-        '<div><div class="sub-table-title" style="color:var(--red)">🔻 今日收入下降 Top</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APP</th><th>Today</th><th>Yesterday Same</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
-        (c12.decrease || []).map(mkRow12).join('') +
-        '</tbody></table></div></div>' +
-      '</div>';
-    g.appendChild(e12);
-  }
-
-  // ── Charts ──────────────────────────────────────────────────────────
-  requestAnimationFrame(function() {
-    // Trend Line Chart
-    if (c2 && document.getElementById('trendChart')) {
-      new Chart(document.getElementById('trendChart'), {
-        type: 'line',
-        data: {
-          labels: c2.data.labels,
-          datasets: [{
-            label: '收入 (USD)',
-            data: c2.data.datasets[0].data,
-            borderColor: '#58a6ff',
-            backgroundColor: 'rgba(88,166,255,0.10)',
-            borderWidth: 2,
-            pointBackgroundColor: '#58a6ff',
-            pointRadius: 3,
-            tension: 0.35,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: '#21262d', borderColor: '#30363d', borderWidth: 1,
-              titleColor: '#8b949e', bodyColor: '#e6edf3',
-              callbacks: { label: function(ctx) { return ' $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); } }
-            }
-          },
-          scales: {
-            x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 8 } },
-            y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 }, callback: function(v) { return '$' + v.toLocaleString(); } } }
-          }
-        }
-      });
-    }
+// ── Tab 切换 ──────────────────────────────────────────────────────────────────
+function switchTab(panel, el) {
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['prt', 'pid', 'prt_pid'].forEach(p => {
+    document.getElementById(`panel-${p}`).style.display = p === panel ? '' : 'none';
   });
 }
 
-renderAll();
+// ── 触发拉取 ──────────────────────────────────────────────────────────────────
+async function triggerPull() {
+  const appids = document.getElementById('pull-appids').value.trim();
+  const start = document.getElementById('pull-start').value;
+  const end = document.getElementById('pull-end').value;
+  const scheduled = document.getElementById('scheduled-check').checked;
+
+  if (!appids) { showStatus('error', 'APPID 不能为空'); return; }
+  if (!start || !end) { showStatus('error', '请选择时间范围'); return; }
+
+  const btn = document.getElementById('pull-btn');
+  btn.disabled = true;
+  showStatus('running', '<span class="spinner"></span>任务已提交，正在拉取数据...');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appids, start_date: start, end_date: end, scheduled }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showStatus('running', `<span class="spinner"></span>任务运行中，完成后将通知飞书群...`);
+      pollJobStatus();
+    } else {
+      showStatus('error', '提交失败: ' + data.message);
+      btn.disabled = false;
+    }
+  } catch(e) {
+    showStatus('error', '请求失败: ' + e.message + '（请确认后端已启动）');
+    btn.disabled = false;
+  }
+}
+
+function showStatus(type, msg) {
+  const bar = document.getElementById('pull-status');
+  bar.className = 'status-bar ' + type;
+  bar.innerHTML = msg;
+}
+
+async function pollJobStatus() {
+  const btn = document.getElementById('pull-btn');
+  const timer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/job/status`);
+      const data = await res.json();
+      if (!data.running) {
+        clearInterval(timer);
+        btn.disabled = false;
+        const r = data.last_result;
+        if (r && r.success) {
+          showStatus('success', `✅ 拉取成功！Common: ${r.counts?.common || 0} 条，Block: ${r.counts?.block || 0} 条，TrackSrc: ${r.counts?.tracksrc || 0} 条`);
+          loadAllPanels();
+        } else {
+          showStatus('error', '❌ 拉取失败: ' + (r?.message || '未知错误'));
+        }
+      }
+    } catch(e) { /* 忽略轮询错误 */ }
+  }, 3000);
+}
+
+// ── API 地址配置弹窗 ────────────────────────────────────────────────────────────────────────
+function showApiConfig() {
+  document.getElementById('api-base-input').value = API_BASE;
+  const modal = document.getElementById('api-modal');
+  modal.style.display = 'flex';
+}
+function closeApiConfig() {
+  document.getElementById('api-modal').style.display = 'none';
+}
+function saveApiConfig() {
+  const val = document.getElementById('api-base-input').value.trim().replace(/\/$/, '');
+  if (!val) return;
+  API_BASE = val;
+  localStorage.setItem('appid_api_base', val);
+  closeApiConfig();
+  loadAllPanels();
+}
+
+// ── 初始化 ──────────────────────────────────────────────────────────────────────────────
+// 页面加载完成后立即加载数据
+loadAllPanels();
 </script>
 </body>
 </html>
