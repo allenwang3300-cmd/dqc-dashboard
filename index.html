@@ -900,7 +900,9 @@ function renderAll() {
           var prec = (typeof row.precision === 'number') ? row.precision : 0;
           var tag = (row.metric_type === 'composite') ? '<span class="composite-tag">composite</span>' : '';
           var safeKey = String(key).replace(/'/g, "\\'");
-          html += '<tr class="metric-row" onclick="_navigateMonitor(\'metric\',\'' + safeKey + '\')">' +
+          // [Task 8.10] composite 行 → composite view (3 图联动); single 行 → metric view (单图)
+          var _view = (row.metric_type === 'composite') ? 'composite' : 'metric';
+          html += '<tr class="metric-row" onclick="_navigateMonitor(\'' + _view + '\',\'' + safeKey + '\')">' +
                     '<td>' + name + tag + '</td>' +
                     '<td>' + _fmtMonitorValue(unit, prec, row.today) + '</td>' +
                     '<td>' + _fmtMonitorValue(unit, prec, row.yesterday) + '</td>' +
@@ -1517,7 +1519,7 @@ function renderAll() {
       '已迁移到 <strong style="color:var(--accent)">📈 投放监控</strong> tab — 含 智能归因 + 多 AM 过滤 + 5 dates 对比 (Today / Yesterday / D-7 / D-15 / D-30)' +
       '<div style="margin-top:14px">' +
         '<button type="button" ' +
-          'onclick="requestAnimationFrame(function() { if (typeof _switchTab === \'function\') _switchTab(\'monitor\'); if (typeof _navigateMonitor === \'function\') _navigateMonitor(\'metric\',\'cr\'); })" ' +
+          'onclick="requestAnimationFrame(function() { if (typeof _switchTab === \'function\') _switchTab(\'monitor\'); if (typeof _navigateMonitor === \'function\') _navigateMonitor(\'composite\',\'cr\'); })" ' +
           'style="background:var(--accent);color:#0d1117;border:0;padding:9px 22px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">' +
           '→ 进入 CR 分析' +
         '</button>' +
