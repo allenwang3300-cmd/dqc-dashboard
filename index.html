@@ -1487,24 +1487,30 @@ function renderAll() {
     g.appendChild(e4);
   }
 
-  // Card 5: Top Revenue APP + Top Install APP
-  var c5 = cards['top_app'];
-  if (c5) {
-    var e5 = card('card-full', '#56d364');
-    e5.innerHTML = '<div class="card-title">' + c5.title + '</div>' +
+  // [Task T1, 2026-05-19] Card 5 top_app (Top 5 收入 APP / Top 10 安装 APP, absolute revenue) 已删除
+  // 替换为 yesterday_app_diff 增降幅渲染 (T2) — 跟 today_app_diff 形成 today/yesterday pair
+  var c_yad = cards['yesterday_app_diff'];
+  if (c_yad) {
+    var e_yad = card('card-full', '#56d364');
+    var mkRowYad = function(r) {
+      var _p = r.prod || '--';
+      var _n = r.app_name || '';
+      var _lbl = (_n && _n !== _p) ? (_p + ' (' + (_n.length > 20 ? _n.substring(0,18)+'..' : _n) + ')') : _p;
+      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
+      return '<tr><td title="' + (_n||_p) + '">' + _lbl + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
+    };
+    e_yad.innerHTML = '<div class="card-title">' + c_yad.title + '</div>' +
       '<div class="double-table">' +
-        '<div><div class="sub-table-title">Top 5 收入 APP</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
-        (c5.top_revenue || []).map(function(r) {
-          var _lbl5a=(function(){var _p=r.prod||'--',_n=r.app_name||'';if(_n&&_n!==_p){var _s=_n.length>20?_n.substring(0,18)+'..':_n;return _p+' ('+_s+')';}return _p;})(); return '<tr><td title="'+( r.app_name||r.prod||'')+'">'+_lbl5a+'</td><td>$'+fmt(r.yesterday)+'</td><td>$'+fmt(r.day_before)+'</td><td class="'+(r.diff>=0?'tag-pos':'tag-neg')+'">'+(r.diff>=0?'+':'')+'$'+fmt(r.diff)+'</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
-        '<div><div class="sub-table-title">Top 10 安装 APP</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>APPID</th><th>Yesterday</th><th>DayBefore</th><th>差额</th></tr></thead><tbody>' +
-        (c5.top_install || []).map(function(r) {
-          var _lbl5b=(function(){var _p=r.prod||'--',_n=r.app_name||'';if(_n&&_n!==_p){var _s=_n.length>20?_n.substring(0,18)+'..':_n;return _p+' ('+_s+')';}return _p;})(); return '<tr><td title="'+(r.app_name||r.prod||'')+'">'+_lbl5b+'</td><td>'+fmtInt(r.yesterday)+'</td><td>'+fmtInt(r.day_before)+'</td><td class="'+(r.diff>=0?'tag-pos':'tag-neg')+'">'+(r.diff>=0?'+':'')+fmtInt(r.diff)+'</td></tr>';
-        }).join('') + '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--green)">🔺 昨日收入增长 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>APP</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
+        (c_yad.increase || []).map(mkRowYad).join('') +
+        '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--red)">🔻 昨日收入下降 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>APP</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
+        (c_yad.decrease || []).map(mkRowYad).join('') +
+        '</tbody></table></div></div>' +
       '</div>';
-    g.appendChild(e5);
+    g.appendChild(e_yad);
   }
 
 
@@ -1790,6 +1796,52 @@ function renderAll() {
         '</tbody></table></div></div>' +
       '</div>';
     g.appendChild(e12);
+  }
+
+  // [Task T3, 2026-05-19] Card 12c: Today Advertiser Revenue Diff (今日 Advertiser 收入增降幅)
+  var c12c = cards['today_advertiser_diff'];
+  if (c12c) {
+    var e12c = card('card-full', '#79c0ff');
+    var mkRow12c = function(r) {
+      var _sn = r.source_name || '--';
+      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
+      return '<tr><td>' + _sn + '</td><td>$' + fmt(r.today) + '</td><td>$' + fmt(r.yesterday_same) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
+    };
+    e12c.innerHTML = '<div class="card-title">' + c12c.title + '</div>' +
+      '<div class="double-table">' +
+        '<div><div class="sub-table-title" style="color:var(--green)">🔺 今日收入增长 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Today</th><th>Yesterday Same</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
+        (c12c.increase || []).map(mkRow12c).join('') +
+        '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--red)">🔻 今日收入下降 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Today</th><th>Yesterday Same</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
+        (c12c.decrease || []).map(mkRow12c).join('') +
+        '</tbody></table></div></div>' +
+      '</div>';
+    g.appendChild(e12c);
+  }
+
+  // [Task T3, 2026-05-19] Card 12d: Yesterday Advertiser Revenue Diff (昨日 Advertiser 收入增降幅, 整日)
+  var c12d = cards['yesterday_advertiser_diff'];
+  if (c12d) {
+    var e12d = card('card-full', '#79c0ff');
+    var mkRow12d = function(r) {
+      var _sn = r.source_name || '--';
+      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
+      return '<tr><td>' + _sn + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
+    };
+    e12d.innerHTML = '<div class="card-title">' + c12d.title + '</div>' +
+      '<div class="double-table">' +
+        '<div><div class="sub-table-title" style="color:var(--green)">🔺 昨日收入增长 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
+        (c12d.increase || []).map(mkRow12d).join('') +
+        '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--red)">🔻 昨日收入下降 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
+        (c12d.decrease || []).map(mkRow12d).join('') +
+        '</tbody></table></div></div>' +
+      '</div>';
+    g.appendChild(e12d);
   }
 
 
@@ -2435,7 +2487,11 @@ renderAll();
         if (c.id === 'revenue_by_date') { Object.assign(c, merged[c.id]); }
         else if (c.id === 'recent_revenue_trends') { c.data = merged[c.id]; }
         else if (c.id === 'revenue_by_prt') { c.rows = merged[c.id]; }
-        else if (c.id === 'top_app') { Object.assign(c, merged[c.id]); }
+        // [Task T1, 2026-05-19] top_app 已删, forwarding 留 dead code 注释方便回滚 (~3 lines 不影响)
+        // [Task T4, 2026-05-19] 加 3 个新 cid forwarding (yesterday_app_diff + 2 advertiser)
+        else if (c.id === 'yesterday_app_diff') { Object.assign(c, merged[c.id]); }
+        else if (c.id === 'today_advertiser_diff') { Object.assign(c, merged[c.id]); }
+        else if (c.id === 'yesterday_advertiser_diff') { Object.assign(c, merged[c.id]); }
         else if (c.id === 'fraud_by_country') { c.rows = merged[c.id]; }
         else if (c.id === 'track_source_click') { Object.assign(c, merged[c.id]); }
         else if (c.id === 'app_tracksource_click') { c.rows = merged[c.id]; }
