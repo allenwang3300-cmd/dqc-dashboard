@@ -2061,10 +2061,11 @@ renderAll();
       }
     } catch (e) { /* silent */ }
 
-    // 还原 URL hash 子路由 (e.g. 直接打开 #monitor/metric/cr)
-    if (typeof window._restoreMonitorFromHash === 'function') window._restoreMonitorFromHash();
-
-    // Hash 变化时同步 sub-page (浏览器返回键 + 手动改 URL)
+    // [UX fix, 2026-05-19] 默认 tab = DQC 巡检 (用户主流诉求).
+    // 不在 page load 时根据 URL hash 自动切 monitor — 防浏览器 hash 残留 #monitor/...
+    // 导致刷新默认进监控 tab. Trade-off: share URL `#monitor/metric/cr` 不再 auto-restore,
+    // 用户需手动点 📈 投放监控 tab (Allen 5/19 决定: 默认体验 > share URL fidelity).
+    // hashchange listener 保留 — 用户主动改 URL 仍触发 (e.g. 浏览器返回键).
     window.addEventListener('hashchange', function() {
       if ((window.location.hash || '').indexOf('#monitor') === 0) {
         window._restoreMonitorFromHash();
