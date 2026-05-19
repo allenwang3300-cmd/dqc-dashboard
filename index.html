@@ -1513,6 +1513,29 @@ function renderAll() {
     g.appendChild(e_yad);
   }
 
+  // [Task UX move, 2026-05-19] Card 12d 上移: Yesterday Advertiser Revenue Diff 紧邻 yesterday_app_diff (昨日复盘 section)
+  var c12d = cards['yesterday_advertiser_diff'];
+  if (c12d) {
+    var e12d = card('card-full', '#79c0ff');
+    var mkRow12d = function(r) {
+      var _sn = r.source_name || '--';
+      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
+      return '<tr><td>' + _sn + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
+    };
+    e12d.innerHTML = '<div class="card-title">' + c12d.title + '</div>' +
+      '<div class="double-table">' +
+        '<div><div class="sub-table-title" style="color:var(--green)">🔺 昨日收入增长 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
+        (c12d.increase || []).map(mkRow12d).join('') +
+        '</tbody></table></div></div>' +
+        '<div><div class="sub-table-title" style="color:var(--red)">🔻 昨日收入下降 Top</div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
+        (c12d.decrease || []).map(mkRow12d).join('') +
+        '</tbody></table></div></div>' +
+      '</div>';
+    g.appendChild(e12d);
+  }
+
 
   // ── [Task 10, 2026-05-18] CR 小时级对比 已迁移到 monitor tab — cross-link stub ──
   // 老 cards['cr_hourly_compare'] 已从 dqc_executor.py 删除. 此 stub 留在 dqc 巡检看板原位置,
@@ -1821,28 +1844,7 @@ function renderAll() {
     g.appendChild(e12c);
   }
 
-  // [Task T3, 2026-05-19] Card 12d: Yesterday Advertiser Revenue Diff (昨日 Advertiser 收入增降幅, 整日)
-  var c12d = cards['yesterday_advertiser_diff'];
-  if (c12d) {
-    var e12d = card('card-full', '#79c0ff');
-    var mkRow12d = function(r) {
-      var _sn = r.source_name || '--';
-      var sign = r.is_positive ? 'tag-pos' : 'tag-neg';
-      return '<tr><td>' + _sn + '</td><td>$' + fmt(r.yesterday) + '</td><td>$' + fmt(r.day_before) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + '$' + fmt(r.diff) + '</td><td class="' + sign + '">' + (r.is_positive?'+':'') + r.diff_pct + '%</td></tr>';
-    };
-    e12d.innerHTML = '<div class="card-title">' + c12d.title + '</div>' +
-      '<div class="double-table">' +
-        '<div><div class="sub-table-title" style="color:var(--green)">🔺 昨日收入增长 Top</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>增幅</th></tr></thead><tbody>' +
-        (c12d.increase || []).map(mkRow12d).join('') +
-        '</tbody></table></div></div>' +
-        '<div><div class="sub-table-title" style="color:var(--red)">🔻 昨日收入下降 Top</div>' +
-        '<div class="tbl-wrap"><table><thead><tr><th>Advertiser</th><th>Yesterday</th><th>DayBefore</th><th>差额</th><th>降幅</th></tr></thead><tbody>' +
-        (c12d.decrease || []).map(mkRow12d).join('') +
-        '</tbody></table></div></div>' +
-      '</div>';
-    g.appendChild(e12d);
-  }
+  // [Task UX move, 2026-05-19] yesterday_advertiser_diff (原 Card 12d) 已上移到 yesterday_app_diff 紧邻位置 (L1515 区)
 
 
 
