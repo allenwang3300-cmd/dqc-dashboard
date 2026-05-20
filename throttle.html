@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>限流分析 — OpenClaw</title>
+  <!-- Chart.js + annotation plugin (跟 index.html 同版本) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
+      --accent: #58a6ff; --green: #3fb950; --red: #f78166; --yellow: #e3b341;
+      --purple: #d2a8ff; --text: #e6edf3; --muted: #8b949e; --dim: #484f58;
+      --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh; padding: 20px 24px 40px;
+    }
+
+    /* Header */
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #f78166 0%, #e3b341 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .header-title h1 { font-size: 18px; font-weight: 700; }
+    .header-title p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .header-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: var(--accent); }
+
+    /* Nav */
+    nav.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    nav.tabs a { padding: 6px 14px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); text-decoration: none; font-size: 13px; }
+    nav.tabs a:hover { color: var(--text); }
+    nav.tabs a.active { color: var(--text); background: var(--surface2); border-color: var(--accent); }
+
+    /* Stats grid */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+    .stat-card label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-card value { font-size: 28px; font-weight: 700; display: block; margin-top: 6px; }
+    .stat-card.severe value { color: var(--red); }
+    .stat-card.warn value { color: var(--yellow); }
+    .stat-card.ok value { color: var(--green); }
+
+    /* Sections */
+    section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow); }
+    section h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    section .section-meta { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .3px; background: var(--surface2); }
+    tr:hover td { background: var(--surface2); }
+    .severity-severe { color: var(--red); font-weight: 700; }
+    .severity-medium { color: var(--yellow); font-weight: 600; }
+    .severity-light  { color: var(--purple); }
+    .severity-unaffected { color: var(--green); }
+
+    /* Cards grid */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all .15s; }
+    .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .card-app { font-size: 13px; font-weight: 700; word-break: break-all; }
+    .card-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .card-duration { font-size: 11px; color: var(--text); margin-top: 6px; }
+    .card-score { font-size: 11px; margin-top: 6px; }
+    .card-tags { font-size: 10px; color: var(--muted); margin-top: 6px; word-break: break-all; }
+    .card-confidence { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* Detail */
+    #detail { display: none; }
+    #detail.visible { display: block; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .detail-close { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .detail-close:hover { border-color: var(--accent); }
+    .detail-summary { background: var(--surface2); padding: 12px; border-radius: 6px; margin-bottom: 14px; font-size: 12px; line-height: 1.7; }
+    .detail-summary strong { color: var(--accent); }
+    .detail-warnings { background: rgba(247,129,102,.08); border: 1px solid var(--red); border-radius: 6px; padding: 10px; margin-bottom: 14px; }
+    .detail-warnings .warning-item { font-size: 11px; color: var(--yellow); margin: 4px 0; }
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .chart-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; height: 280px; position: relative; }
+    .chart-box h3 { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .3px; }
+    .chart-box canvas { max-height: 230px; }
+    .conclusion { background: var(--surface2); border-left: 3px solid var(--accent); padding: 10px 14px; font-size: 12px; line-height: 1.7; margin-top: 10px; }
+
+    /* Manual query */
+    #manual-query form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    #manual-query input, #manual-query button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+    #manual-query button { background: var(--accent); color: var(--bg); border: none; font-weight: 700; cursor: pointer; }
+    #manual-query .form-note { font-size: 11px; color: var(--muted); width: 100%; }
+
+    .loading { color: var(--muted); font-size: 11px; }
+    .empty { color: var(--muted); font-size: 12px; padding: 16px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">🦞</div>
+      <div class="header-title">
+        <h1>OpenClaw 限流分析</h1>
+        <p>APP throttle impact analyzer — V5.2</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span class="badge" id="scan-date-badge">Loading...</span>
+      <span class="badge" id="version-badge">v5.2</span>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a href="./index.html">DQC 巡检</a>
+    <a href="./throttle.html" class="active">限流分析</a>
+  </nav>
+
+  <section id="summary">
+    <h2>📊 总览</h2>
+    <div class="stats" id="stats-grid">
+      <div class="stat-card"><label>扫描 APP</label><value id="stat-scanned">-</value></div>
+      <div class="stat-card warn"><label>限流事件</label><value id="stat-events">-</value></div>
+      <div class="stat-card severe"><label>严重</label><value id="stat-severe">-</value></div>
+      <div class="stat-card severe"><label>24h+ 持续</label><value id="stat-24h">-</value></div>
+    </div>
+  </section>
+
+  <section id="alerts-24h">
+    <h2>🚨 24h+ 限流告警 <span class="section-meta" id="alerts-meta"></span></h2>
+    <div id="alerts-content"><p class="loading">Loading...</p></div>
+  </section>
+
+  <section id="top-apps">
+    <h2>Top 受限 APP <span class="section-meta">点击卡片查看详情</span></h2>
+    <div id="top-apps-content"><p class="loading">Loading...</p></div>
+  </section>
+
+  <section id="detail">
+    <div class="detail-header">
+      <h2 id="detail-title">详情</h2>
+      <button class="detail-close" onclick="closeDetail()">关闭</button>
+    </div>
+    <div id="detail-content"></div>
+  </section>
+
+  <section id="manual-query">
+    <h2>🔍 手工查询</h2>
+    <form onsubmit="handleManualQuery(event)">
+      <input type="text" id="manual-app" placeholder="APPID (例 com.taxis99)" required>
+      <input type="datetime-local" id="manual-t0" required>
+      <button type="submit">分析</button>
+      <span class="form-note">手工查询暂为占位入口, Slice 7 接 backend API. 当前只能查 cron 已扫描过的 APP (点 Top 卡片).</span>
+    </form>
+  </section>
+
+  <script>
+    const TODAY = new URLSearchParams(window.location.search).get('date') || null;
+
+    let summaryData = null;
+    const detailCache = {};
+    let activeCharts = [];
+
+    async function init() {
+      try {
+        // 找最新 summary 文件: URL ?date= 优先, 否则用 hardcoded fallback (cron 写出来后 link 会更新)
+        const dateStr = TODAY || guessLatestDate();
+        const resp = await fetch(`./data/throttle_summary_${dateStr}.json`);
+        if (!resp.ok) throw new Error(`找不到 throttle_summary_${dateStr}.json (HTTP ${resp.status})`);
+        summaryData = await resp.json();
+        renderSummary();
+      } catch (e) {
+        document.getElementById('alerts-content').innerHTML = `<p class="empty">⚠️ 加载失败: ${e.message}</p>`;
+        document.getElementById('top-apps-content').innerHTML = '';
+      }
+    }
+
+    function guessLatestDate() {
+      // fallback: 用昨天 UTC 日期
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - 1);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function renderSummary() {
+      document.getElementById('scan-date-badge').textContent = `scan: ${summaryData.scan_date}`;
+      document.getElementById('version-badge').textContent = summaryData.version;
+      const s = summaryData.summary;
+      document.getElementById('stat-scanned').textContent = s.total_scanned;
+      document.getElementById('stat-events').textContent = s.candidates_found;
+      document.getElementById('stat-severe').textContent = s.severe_count;
+      document.getElementById('stat-24h').textContent = s.alert_24h_count;
+
+      renderAlerts();
+      renderTopApps();
+    }
+
+    function renderAlerts() {
+      const alerts = summaryData.alerts_24h || [];
+      const el = document.getElementById('alerts-content');
+      document.getElementById('alerts-meta').textContent = `共 ${alerts.length} 个`;
+      if (!alerts.length) {
+        el.innerHTML = '<p class="empty">✅ 无 24h+ 限流事件</p>';
+        return;
+      }
+      const rows = alerts.map(a => `
+        <tr onclick="showAppDetail('${escapeAttr(a.app_name)}')" style="cursor:pointer">
+          <td>${escapeHtml(a.app_name)}</td>
+          <td>${escapeHtml(a.advertiser_name)}</td>
+          <td>${escapeHtml(a.adv_manager)}</td>
+          <td>${a.event_duration_hours}h</td>
+          <td class="severity-${a.severity.toLowerCase()}">${escapeHtml(a.severity_zh)}</td>
+        </tr>`).join('');
+      el.innerHTML = `<table><thead><tr><th>APPID</th><th>广告主</th><th>AM</th><th>已持续</th><th>严重度</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function renderTopApps() {
+      const tops = summaryData.top_apps || [];
+      const el = document.getElementById('top-apps-content');
+      if (!tops.length) {
+        el.innerHTML = '<p class="empty">✅ 无受限 APP</p>';
+        return;
+      }
+      const cards = tops.map(a => {
+        const tagsZh = a.abnormal_tags_zh.length ? a.abnormal_tags_zh.join('、') : '—';
+        const crFlag = a.cr_real_distorted ? ' · ⚠️ CR失真' : '';
+        return `
+          <div class="card" onclick="showAppDetail('${escapeAttr(a.app_name)}')">
+            <div class="card-app">${escapeHtml(a.app_name)}</div>
+            <div class="card-meta">${escapeHtml(a.advertiser_name)} · AM ${escapeHtml(a.adv_manager)}</div>
+            <div class="card-duration">${escapeHtml(a.duration_tag_zh)} (${a.event_duration_hours}h${a.is_resolved ? ' · 已恢复' : ' · 未恢复'})</div>
+            <div class="card-score severity-${a.severity.toLowerCase()}">limit_score: ${a.limit_score_final.toFixed(3)} · ${escapeHtml(a.severity_zh)}${crFlag}</div>
+            <div class="card-tags">${escapeHtml(tagsZh)}</div>
+            <div class="card-confidence">置信度: ${escapeHtml(a.confidence_level)}</div>
+          </div>`;
+      }).join('');
+      el.innerHTML = `<div class="cards">${cards}</div>`;
+    }
+
+    async function showAppDetail(appName) {
+      const dateStr = summaryData.scan_date;
+      if (!detailCache[appName]) {
+        try {
+          const resp = await fetch(`./data/throttle_details/${dateStr}/${appName}.json`);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          detailCache[appName] = await resp.json();
+        } catch (e) {
+          alert(`加载详情失败: ${e.message}`);
+          return;
+        }
+      }
+      renderDetail(detailCache[appName]);
+    }
+
+    function closeDetail() {
+      document.getElementById('detail').classList.remove('visible');
+      destroyCharts();
+    }
+
+    function destroyCharts() {
+      activeCharts.forEach(c => c.destroy());
+      activeCharts = [];
+    }
+
+    function renderDetail(event) {
+      destroyCharts();
+      const sec = document.getElementById('detail');
+      sec.classList.add('visible');
+      document.getElementById('detail-title').textContent = `${event.app_name} · ${event.advertiser_name} · AM ${event.adv_manager}`;
+
+      const warnings = (event.warnings || []).map(w => `<div class="warning-item">${escapeHtml(w.message)}</div>`).join('');
+      const warningsBlock = warnings ? `<div class="detail-warnings">${warnings}</div>` : '';
+
+      document.getElementById('detail-content').innerHTML = `
+        <div class="detail-summary">
+          <strong>时长</strong>: ${event.event_duration_hours}h (${escapeHtml(event.duration_tag_zh)}) · <strong>状态</strong>: ${escapeHtml(event.is_resolved_zh)}<br>
+          <strong>严重度</strong>: <span class="severity-${event.severity.toLowerCase()}">${escapeHtml(event.severity_zh)}</span>
+          (raw ${event.limit_score.toFixed(3)} × ${event.duration_multiplier_applied} = final <strong>${event.limit_score_final.toFixed(3)}</strong>) ·
+          <strong>置信度</strong>: ${escapeHtml(event.confidence_level)} ·
+          <strong>Baseline</strong>: ${escapeHtml(event.pre_baseline_quality)}<br>
+          <strong>异常标签</strong>: ${event.abnormal_tags_zh.map(escapeHtml).join('、') || '—'}<br>
+          <strong>cr_real 失真</strong>: ${escapeHtml(event.cr_real_distorted_zh)}
+        </div>
+        ${warningsBlock}
+        <div class="charts">
+          <div class="chart-box"><h3>① 链路量级趋势</h3><canvas id="chart-volume"></canvas></div>
+          <div class="chart-box"><h3>② 链路比率趋势</h3><canvas id="chart-rate"></canvas></div>
+          <div class="chart-box"><h3>③ 转化与 Fraud</h3><canvas id="chart-conv"></canvas></div>
+          <div class="chart-box"><h3>④ 双通道对比 (暂占位)</h3><canvas id="chart-dual"></canvas></div>
+        </div>
+        <div class="conclusion"><strong>客观结论</strong><br>${escapeHtml(event.conclusion)}</div>
+      `;
+
+      drawCharts(event);
+      sec.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    function drawCharts(event) {
+      const timeline = event.hourly_timeline || [];
+      const labels = timeline.map(h => h.dt.slice(11, 16));  // HH:MM
+      const t0Iso = event.t0;
+      const t0Label = t0Iso.slice(11, 16);
+
+      // 注意: Chart.js canvas 不解析 CSS var(), 必须用字面量颜色 (Allen 2026-05-20 截图反馈).
+      const annot = {
+        type: 'line',
+        scaleID: 'x',
+        value: t0Label,
+        borderColor: '#f78166',
+        borderWidth: 2,
+        borderDash: [4, 4],
+        label: { content: `t0 ${t0Label}`, display: true, position: 'start', backgroundColor: '#f78166', color: '#fff', font: { size: 9 } }
+      };
+      const baseOpts = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#e6edf3', font: { size: 10 } } },
+          annotation: { annotations: { t0: annot } }
+        },
+        scales: {
+          x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } }
+        }
+      };
+
+      // ① 量级
+      activeCharts.push(new Chart(document.getElementById('chart-volume'), {
+        type: 'line',
+        data: { labels, datasets: [
+          { label: 'Common Clicks', data: timeline.map(h => h.clicks), borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,.1)', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'TS Total',      data: timeline.map(h => h.ts_total), borderColor: '#3fb950', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'TS Success',    data: timeline.map(h => h.ts_success), borderColor: '#e3b341', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'OC Discard',    data: timeline.map(h => h.oc_discard), borderColor: '#f78166', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+        ]}, options: baseOpts
+      }));
+
+      // ② 比率
+      activeCharts.push(new Chart(document.getElementById('chart-rate'), {
+        type: 'line',
+        data: { labels, datasets: [
+          { label: 'task_execution_rate', data: timeline.map(h => h.task_execution_rate), borderColor: '#58a6ff', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'send_success_rate',   data: timeline.map(h => h.send_success_rate), borderColor: '#3fb950', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'pipeline_success_rate', data: timeline.map(h => h.pipeline_success_rate), borderColor: '#d2a8ff', tension: .2, borderWidth: 1.5, pointRadius: 2, borderDash: [3, 3] },
+          { label: 'discard_rate',        data: timeline.map(h => h.discard_rate), borderColor: '#f78166', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+        ]}, options: {...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, min: 0, max: 1 } } }
+      }));
+
+      // ③ 转化 + Fraud (双 y 轴: install/event/revenue 左, reject_rate 右)
+      activeCharts.push(new Chart(document.getElementById('chart-conv'), {
+        type: 'line',
+        data: { labels, datasets: [
+          { label: 'install',  data: timeline.map(h => h.installs), borderColor: '#3fb950', yAxisID: 'y', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'event',    data: timeline.map(h => h.events), borderColor: '#58a6ff', yAxisID: 'y', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'revenue ($)', data: timeline.map(h => h.revenue), borderColor: '#e3b341', yAxisID: 'y', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+          { label: 'reject_rate', data: timeline.map(h => (h.true_install + h.reject_install) > 0 ? h.reject_install / (h.true_install + h.reject_install) : null), borderColor: '#f78166', yAxisID: 'y1', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+        ]}, options: {
+          ...baseOpts,
+          scales: {
+            ...baseOpts.scales,
+            y: { type: 'linear', position: 'left', ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+            y1: { type: 'linear', position: 'right', min: 0, max: 1, ticks: { color: '#f78166', font: { size: 9 } }, grid: { drawOnChartArea: false } }
+          }
+        }
+      }));
+
+      // ④ 双通道 (Slice 6 占位: 仅画 ts_success 单条, 真双通道分离 Slice 7 接 fetch_dual_channel)
+      activeCharts.push(new Chart(document.getElementById('chart-dual'), {
+        type: 'line',
+        data: { labels, datasets: [
+          { label: 'TS Success (合并)', data: timeline.map(h => h.ts_success), borderColor: '#58a6ff', tension: .2, borderWidth: 1.5, pointRadius: 2 },
+        ]}, options: baseOpts
+      }));
+    }
+
+    function handleManualQuery(e) {
+      e.preventDefault();
+      const app = document.getElementById('manual-app').value.trim();
+      // Slice 6: 不接 backend, 提示用户从 Top 卡片选; Slice 7 wire 真 API.
+      alert(`手工查询暂未接 backend. 请在上方 Top 卡片找 ${app}, 或本地跑:\\n  python3 -c "from throttle_analyzer.manual_query import manual_query; print(manual_query('${app}', ...))"`);
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s).replace(/`/g, ''); }
+
+    init();
+  </script>
+</body>
+</html>
