@@ -311,15 +311,23 @@
       const t0Iso = event.t0;
       const t0Label = t0Iso.slice(11, 16);
 
-      // 注意: Chart.js canvas 不解析 CSS var(), 必须用字面量颜色 (Allen 2026-05-20 截图反馈).
+      // 注意: Chart.js canvas 不解析 CSS var() (前轮 fix);
+      // 颜色选亮黄不跟 OC Discard / discard_rate 红线撞色 (Allen 2026-05-20 console 验证后 final fix).
       const annot = {
         type: 'line',
         scaleID: 'x',
         value: t0Label,
-        borderColor: '#f78166',
+        borderColor: '#ffff00',
         borderWidth: 2,
-        borderDash: [4, 4],
-        label: { content: `t0 ${t0Label}`, display: true, position: 'start', backgroundColor: '#f78166', color: '#fff', font: { size: 9 } }
+        borderDash: [6, 4],
+        label: {
+          content: `t0 ${t0Label}`,
+          display: true,
+          position: 'start',
+          backgroundColor: '#ffff00',
+          color: '#000',
+          font: { size: 10, weight: 'bold' }
+        }
       };
       const baseOpts = {
         responsive: true, maintainAspectRatio: false,
