@@ -156,6 +156,15 @@
   </section>
 
   <script>
+    // Chart.js 4 plugin 必须显式 register (跟 v3 不同, CDN 引入不自动 attach).
+    // chartjs-plugin-annotation 3.x 暴露全局 window['chartjs-plugin-annotation'].
+    // 不 register 的话 options.plugins.annotation 会被 Chart.js 静默忽略, t0 红虚线就不画.
+    if (window['chartjs-plugin-annotation']) {
+      Chart.register(window['chartjs-plugin-annotation']);
+    } else {
+      console.warn('chartjs-plugin-annotation 未加载, t0 红虚线将缺失');
+    }
+
     const TODAY = new URLSearchParams(window.location.search).get('date') || null;
 
     let summaryData = null;
