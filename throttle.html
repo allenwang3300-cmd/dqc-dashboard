@@ -214,11 +214,11 @@
         return;
       }
       const rows = alerts.map(a => `
-        <tr onclick="showAppDetail('${escapeAttr(a.app_name)}')" style="cursor:pointer">
+        <tr onclick="showAppDetail('${escapeAttr(a.app_name)}', '${escapeAttr(a.t0)}')" style="cursor:pointer">
           <td>${escapeHtml(a.app_name)}</td>
           <td>${escapeHtml(a.advertiser_name)}</td>
           <td>${escapeHtml(a.adv_manager)}</td>
-          <td>${a.event_duration_hours}h</td>
+          <td>${escapeHtml(a.t0.slice(5, 13).replace('T', ' '))} · ${a.event_duration_hours}h</td>
           <td class="severity-${a.severity.toLowerCase()}">${escapeHtml(a.severity_zh)}</td>
         </tr>`).join('');
       el.innerHTML = `<table><thead><tr><th>APPID</th><th>广告主</th><th>AM</th><th>已持续</th><th>严重度</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -235,10 +235,10 @@
         const tagsZh = a.abnormal_tags_zh.length ? a.abnormal_tags_zh.join('、') : '—';
         const crFlag = a.cr_real_distorted ? ' · ⚠️ CR失真' : '';
         return `
-          <div class="card" onclick="showAppDetail('${escapeAttr(a.app_name)}')">
+          <div class="card" onclick="showAppDetail('${escapeAttr(a.app_name)}', '${escapeAttr(a.t0)}')">
             <div class="card-app">${escapeHtml(a.app_name)}</div>
             <div class="card-meta">${escapeHtml(a.advertiser_name)} · AM ${escapeHtml(a.adv_manager)}</div>
-            <div class="card-duration">${escapeHtml(a.duration_tag_zh)} (${a.event_duration_hours}h${a.is_resolved ? ' · 已恢复' : ' · 未恢复'})</div>
+            <div class="card-duration">${escapeHtml(a.duration_tag_zh)} (${a.event_duration_hours}h${a.is_resolved ? ' · 已恢复' : ' · 未恢复'}) · t0 ${escapeHtml(a.t0.slice(11, 16))}</div>
             <div class="card-score severity-${a.severity.toLowerCase()}">limit_score: ${a.limit_score_final.toFixed(3)} · ${escapeHtml(a.severity_zh)}${crFlag}</div>
             <div class="card-tags">${escapeHtml(tagsZh)}</div>
             <div class="card-confidence">置信度: ${escapeHtml(a.confidence_level)}</div>
@@ -247,19 +247,23 @@
       el.innerHTML = `<div class="cards">${cards}</div>`;
     }
 
-    async function showAppDetail(appName) {
+    async function showAppDetail(appName, t0Iso) {
+      // Slice 8C: 同 app 多 t0 不互相覆盖, URL 加 t0_iso_safe (去冒号).
       const dateStr = summaryData.scan_date;
-      if (!detailCache[appName]) {
+      const t0Safe = (t0Iso || '').replace(/:/g, '');
+      const cacheKey = `${appName}_${t0Safe}`;
+      if (!detailCache[cacheKey]) {
         try {
-          const resp = await fetch(`./data/throttle_details/${dateStr}/${appName}.json`);
+          const url = `./data/throttle_details/${dateStr}/${appName}_${t0Safe}.json`;
+          const resp = await fetch(url);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          detailCache[appName] = await resp.json();
+          detailCache[cacheKey] = await resp.json();
         } catch (e) {
           alert(`加载详情失败: ${e.message}`);
           return;
         }
       }
-      renderDetail(detailCache[appName]);
+      renderDetail(detailCache[cacheKey]);
     }
 
     function closeDetail() {
@@ -311,18 +315,20 @@
       const t0Iso = event.t0;
       const t0Label = t0Iso.slice(11, 16);
 
-      // 注意: Chart.js canvas 不解析 CSS var() (前轮 fix);
-      // 颜色选亮黄不跟 OC Discard / discard_rate 红线撞色 (Allen 2026-05-20 console 验证后 final fix).
+      // Slice 8C task 1 final debug: chartjs-plugin-annotation v3.x 推荐 xMin/xMax
+      // 定义 vertical line 端点 (而非 v1/v2 的 scaleID+value 单标量).
+      // 前轮 scaleID 写法可能在 plugin 3.0.1 + Chart.js 4.4.0 组合下被静默 ignore.
+      // 颜色亮黄 (#ffff00) 不撞 OC Discard 红线; borderWidth 加粗到 3 提升可见性.
       const annot = {
         type: 'line',
-        scaleID: 'x',
-        value: t0Label,
+        xMin: t0Label,
+        xMax: t0Label,
         borderColor: '#ffff00',
-        borderWidth: 2,
+        borderWidth: 3,
         borderDash: [6, 4],
         label: {
-          content: `t0 ${t0Label}`,
           display: true,
+          content: `t0 ${t0Label}`,
           position: 'start',
           backgroundColor: '#ffff00',
           color: '#000',
