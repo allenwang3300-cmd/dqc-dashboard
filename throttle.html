@@ -315,36 +315,54 @@
       const t0Iso = event.t0;
       const t0Label = t0Iso.slice(11, 16);
 
-      // Slice 8C.2 hotfix: t0 annotation 回退到 scaleID+value (chartjs-plugin-annotation v3.x
-      // 推荐画 vertical line 的方式, 适用 category scale 用 string 索引 e.g. "08:00").
-      // 上一轮 xMin/xMax 写法在 category scale 下没正确解析 "08:00" string, 被画成对角线
-      // (Allen 实测截图证). 撤销前注释 "v1/v2 vs v3 schema" 误判.
-      // 颜色亮黄 (#ffff00) 不撞 OC Discard 红线; borderWidth 加粗到 3.
-      const annot = {
-        type: 'line',
-        scaleID: 'x',
-        value: t0Label,
-        borderColor: '#ffff00',
-        borderWidth: 3,
-        borderDash: [6, 4],
-        label: {
-          display: true,
-          content: `t0 ${t0Label}`,
-          position: 'start',
-          backgroundColor: '#ffff00',
-          color: '#000',
-          font: { size: 10, weight: 'bold' }
+      // Slice 8C.3 hotfix FINAL: 绕过 chartjs-plugin-annotation, 用 Chart.js native
+      // afterDraw plugin 自己 canvas 画 t0 vertical line + label.
+      // 诊断 (Slice 6/8C/8C.2 三次失败): annotation plugin 在 Chart.js 4 + category scale
+      // 下处理"重复 string 索引"不可靠 — labels 数组里 "08:00" 出现 2 次 (5/13 t0 + 5/14
+      // 同时刻), 不论 scaleID+value 还是 xMin/xMax 都解析失败 (画不出 / 画成对角线).
+      // 改用 native: labels.indexOf 取 numeric index (第一个 match = 5/13 t0), 通过
+      // xScale.getPixelForValue() 转 pixel, ctx 直接画.
+      const t0Index = labels.indexOf(t0Label);
+      const t0LinePlugin = {
+        id: 't0VerticalLine',
+        afterDraw(chart) {
+          if (t0Index < 0) return;
+          const xScale = chart.scales.x;
+          const yScale = chart.scales.y;
+          const x = xScale.getPixelForValue(t0Index);
+          const ctx = chart.ctx;
+
+          ctx.save();
+          // vertical dashed line
+          ctx.setLineDash([6, 4]);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#ffff00';
+          ctx.beginPath();
+          ctx.moveTo(x, yScale.top);
+          ctx.lineTo(x, yScale.bottom);
+          ctx.stroke();
+
+          // label box on top
+          ctx.setLineDash([]);
+          const labelText = `t0 ${t0Label}`;
+          ctx.font = 'bold 10px -apple-system, system-ui, sans-serif';
+          const tw = ctx.measureText(labelText).width;
+          const pad = 5;
+          ctx.fillStyle = '#ffff00';
+          ctx.fillRect(x - tw/2 - pad, yScale.top - 19, tw + pad*2, 16);
+          ctx.fillStyle = '#000';
+          ctx.fillText(labelText, x - tw/2, yScale.top - 7);
+          ctx.restore();
         }
       };
-      // Slice 8C.2 hotfix: hover tooltip 显式 enabled (Chart.js 4 + plugin 3.0.1 组合下
-      // 我们只设 legend+annotation 没设 tooltip, 实测 default tooltip 被吞).
-      // mode:'index' + intersect:false → 同 x 位置所有 dataset 一起显示, 不需精确 hover 在点上.
+
+      // baseOpts.plugins 移除 annotation 配置, 只留 legend + tooltip.
+      // tooltip 显式 enabled (Slice 8C.2 hotfix 保留, 修 hover 数据消失 regression).
       const baseOpts = {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { labels: { color: '#e6edf3', font: { size: 10 } } },
-          tooltip: { enabled: true, mode: 'index', intersect: false },
-          annotation: { annotations: { t0: annot } }
+          tooltip: { enabled: true, mode: 'index', intersect: false }
         },
         scales: {
           x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } },
@@ -360,7 +378,8 @@
           { label: 'TS Total',      data: timeline.map(h => h.ts_total), borderColor: '#3fb950', tension: .2, borderWidth: 1.5, pointRadius: 2 },
           { label: 'TS Success',    data: timeline.map(h => h.ts_success), borderColor: '#e3b341', tension: .2, borderWidth: 1.5, pointRadius: 2 },
           { label: 'OC Discard',    data: timeline.map(h => h.oc_discard), borderColor: '#f78166', tension: .2, borderWidth: 1.5, pointRadius: 2 },
-        ]}, options: baseOpts
+        ]}, options: baseOpts,
+        plugins: [t0LinePlugin]
       }));
 
       // ② 比率
@@ -371,7 +390,8 @@
           { label: 'send_success_rate',   data: timeline.map(h => h.send_success_rate), borderColor: '#3fb950', tension: .2, borderWidth: 1.5, pointRadius: 2 },
           { label: 'pipeline_success_rate', data: timeline.map(h => h.pipeline_success_rate), borderColor: '#d2a8ff', tension: .2, borderWidth: 1.5, pointRadius: 2, borderDash: [3, 3] },
           { label: 'discard_rate',        data: timeline.map(h => h.discard_rate), borderColor: '#f78166', tension: .2, borderWidth: 1.5, pointRadius: 2 },
-        ]}, options: {...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, min: 0, max: 1 } } }
+        ]}, options: {...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, min: 0, max: 1 } } },
+        plugins: [t0LinePlugin]
       }));
 
       // ③ 转化 + Fraud (双 y 轴: install/event/revenue 左, reject_rate 右)
@@ -389,7 +409,8 @@
             y: { type: 'linear', position: 'left', ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.04)' } },
             y1: { type: 'linear', position: 'right', min: 0, max: 1, ticks: { color: '#f78166', font: { size: 9 } }, grid: { drawOnChartArea: false } }
           }
-        }
+        },
+        plugins: [t0LinePlugin]
       }));
 
       // ④ 双通道 (Slice 6 占位: 仅画 ts_success 单条, 真双通道分离 Slice 7 接 fetch_dual_channel)
@@ -397,7 +418,8 @@
         type: 'line',
         data: { labels, datasets: [
           { label: 'TS Success (合并)', data: timeline.map(h => h.ts_success), borderColor: '#58a6ff', tension: .2, borderWidth: 1.5, pointRadius: 2 },
-        ]}, options: baseOpts
+        ]}, options: baseOpts,
+        plugins: [t0LinePlugin]
       }));
     }
 
