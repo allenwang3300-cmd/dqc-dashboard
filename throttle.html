@@ -315,14 +315,15 @@
       const t0Iso = event.t0;
       const t0Label = t0Iso.slice(11, 16);
 
-      // Slice 8C task 1 final debug: chartjs-plugin-annotation v3.x 推荐 xMin/xMax
-      // 定义 vertical line 端点 (而非 v1/v2 的 scaleID+value 单标量).
-      // 前轮 scaleID 写法可能在 plugin 3.0.1 + Chart.js 4.4.0 组合下被静默 ignore.
-      // 颜色亮黄 (#ffff00) 不撞 OC Discard 红线; borderWidth 加粗到 3 提升可见性.
+      // Slice 8C.2 hotfix: t0 annotation 回退到 scaleID+value (chartjs-plugin-annotation v3.x
+      // 推荐画 vertical line 的方式, 适用 category scale 用 string 索引 e.g. "08:00").
+      // 上一轮 xMin/xMax 写法在 category scale 下没正确解析 "08:00" string, 被画成对角线
+      // (Allen 实测截图证). 撤销前注释 "v1/v2 vs v3 schema" 误判.
+      // 颜色亮黄 (#ffff00) 不撞 OC Discard 红线; borderWidth 加粗到 3.
       const annot = {
         type: 'line',
-        xMin: t0Label,
-        xMax: t0Label,
+        scaleID: 'x',
+        value: t0Label,
         borderColor: '#ffff00',
         borderWidth: 3,
         borderDash: [6, 4],
@@ -335,10 +336,14 @@
           font: { size: 10, weight: 'bold' }
         }
       };
+      // Slice 8C.2 hotfix: hover tooltip 显式 enabled (Chart.js 4 + plugin 3.0.1 组合下
+      // 我们只设 legend+annotation 没设 tooltip, 实测 default tooltip 被吞).
+      // mode:'index' + intersect:false → 同 x 位置所有 dataset 一起显示, 不需精确 hover 在点上.
       const baseOpts = {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { labels: { color: '#e6edf3', font: { size: 10 } } },
+          tooltip: { enabled: true, mode: 'index', intersect: false },
           annotation: { annotations: { t0: annot } }
         },
         scales: {
