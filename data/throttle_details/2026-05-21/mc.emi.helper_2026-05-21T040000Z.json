@@ -11,13 +11,11 @@
   "duration_tag_zh": "24小时内限流",
   "abnormal_tags": [
     "Execution Limited",
-    "Offer Cool Limited",
-    "Multi-Layer Cascade"
+    "Offer Cool Limited"
   ],
   "abnormal_tags_zh": [
     "执行率受阻",
-    "丢弃率走高",
-    "链路同步塌方·疑似MMP"
+    "丢弃率走高"
   ],
   "limit_score": 0.4285,
   "limit_score_final": 0.6427,
@@ -28,7 +26,7 @@
   "pre_baseline_quality": "可信",
   "cr_real_distorted": false,
   "cr_real_distorted_zh": "正常",
-  "cascade_correlation": null,
+  "cascade_correlation": 0.0,
   "metrics": {
     "task_execution_rate": {
       "pre": 85.654718,
@@ -364,5 +362,5 @@
       "message": "block_reason 仅 day 粒度, 不能强绑定到具体小时"
     }
   ],
-  "conclusion": "事件持续 9 小时, 时长标签为「24小时内限流」, 状态: 已恢复. 异常层级: 执行率受阻, 丢弃率走高. 同时命中「链路同步塌方·疑似MMP」, 强暗示 MMP 端或网络出站层共同根因. 综合判定严重度: 严重 (limit_score_final=0.643), 置信度: High."
+  "conclusion": "事件持续 9 小时, 时长标签为「24小时内限流」, 状态: 已恢复. 异常层级: 执行率受阻, 丢弃率走高. 综合判定严重度: 严重 (limit_score_final=0.643), 置信度: High."
 }
