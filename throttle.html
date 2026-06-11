@@ -89,6 +89,17 @@
     .chart-box canvas { max-height: 230px; }
     .conclusion { background: var(--surface2); border-left: 3px solid var(--accent); padding: 10px 14px; font-size: 12px; line-height: 1.7; margin-top: 10px; }
 
+    /* Slice 9: PRT+PID 健康度 table (detail page) */
+    .prt-pid-health { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; box-shadow: none; }
+    .prt-pid-health h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .prt-pid-health .hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .prt-pid-health td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .row-healthy  { color: #4ec9b0; }
+    .row-moderate { color: #e3b341; }
+    .row-severe   { color: #f78166; }
+    .row-unknown  { color: var(--muted); }
+    .muted-inline { color: var(--muted); font-weight: 400; font-size: .9em; }
+
     /* Manual query */
     #manual-query form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     #manual-query input, #manual-query button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; }
@@ -220,14 +231,18 @@
         el.innerHTML = '<p class="empty">✅ 无 24h+ 限流事件</p>';
         return;
       }
-      const rows = alerts.map(a => `
+      const rows = alerts.map(a => {
+        // Slice 10: 严重度 cell 含 5 档缓解 status (灰字小标), 让 AM 一眼看出当前是否在缓解
+        const statusZh = a.status_zh ? ` <span class="muted-inline">· ${escapeHtml(a.status_zh)}</span>` : '';
+        return `
         <tr onclick="showAppDetail('${escapeAttr(a.app_name)}', '${escapeAttr(a.t0)}')" style="cursor:pointer">
           <td>${escapeHtml(a.app_name)}</td>
           <td>${escapeHtml(a.advertiser_name)}</td>
           <td>${escapeHtml(a.adv_manager)}</td>
           <td>${escapeHtml(a.t0.slice(5, 13).replace('T', ' '))} · ${a.event_duration_hours}h</td>
-          <td class="severity-${a.severity.toLowerCase()}">${escapeHtml(a.severity_zh)}</td>
-        </tr>`).join('');
+          <td class="severity-${a.severity.toLowerCase()}">${escapeHtml(a.severity_zh)}${statusZh}</td>
+        </tr>`;
+      }).join('');
       el.innerHTML = `<table><thead><tr><th>APPID</th><th>广告主</th><th>AM</th><th>已持续</th><th>严重度</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
@@ -245,7 +260,7 @@
           <div class="card" onclick="showAppDetail('${escapeAttr(a.app_name)}', '${escapeAttr(a.t0)}')">
             <div class="card-app">${escapeHtml(a.app_name)}</div>
             <div class="card-meta">${escapeHtml(a.advertiser_name)} · AM ${escapeHtml(a.adv_manager)}</div>
-            <div class="card-duration">${escapeHtml(a.duration_tag_zh)} (${a.event_duration_hours}h${a.is_resolved ? ' · 已恢复' : ' · 未恢复'}) · t0 ${escapeHtml(a.t0.slice(11, 16))}</div>
+            <div class="card-duration">${escapeHtml(a.duration_tag_zh)} (${a.event_duration_hours}h · ${escapeHtml(a.status_zh || (a.is_resolved ? '已恢复' : '未恢复'))}) · t0 ${escapeHtml(a.t0.slice(11, 16))}</div>
             <div class="card-score severity-${a.severity.toLowerCase()}">limit_score: ${a.limit_score_final.toFixed(3)} · ${escapeHtml(a.severity_zh)}${crFlag}</div>
             <div class="card-tags">${escapeHtml(tagsZh)}</div>
             <div class="card-confidence">置信度: ${escapeHtml(a.confidence_level)}</div>
@@ -294,7 +309,7 @@
 
       document.getElementById('detail-content').innerHTML = `
         <div class="detail-summary">
-          <strong>时长</strong>: ${event.event_duration_hours}h (${escapeHtml(event.duration_tag_zh)}) · <strong>状态</strong>: ${escapeHtml(event.is_resolved_zh)}<br>
+          <strong>时长</strong>: ${event.event_duration_hours}h (${escapeHtml(event.duration_tag_zh)}) · <strong>状态</strong>: ${escapeHtml(event.status_zh || event.is_resolved_zh)}<br>
           <strong>严重度</strong>: <span class="severity-${event.severity.toLowerCase()}">${escapeHtml(event.severity_zh)}</span>
           (raw ${event.limit_score.toFixed(3)} × ${event.duration_multiplier_applied} = final <strong>${event.limit_score_final.toFixed(3)}</strong>) ·
           <strong>置信度</strong>: ${escapeHtml(event.confidence_level)} ·
@@ -309,11 +324,63 @@
           <div class="chart-box"><h3>③ 转化与 Fraud</h3><canvas id="chart-conv"></canvas></div>
           <div class="chart-box"><h3>④ 双通道对比 (暂占位)</h3><canvas id="chart-dual"></canvas></div>
         </div>
+        <section class="prt-pid-health">
+          <h3>📊 PRT+PID 健康度 (过去 7 天)</h3>
+          <p class="hint">按日均 click 排序, 推荐切流量到 ✅ 健康 行</p>
+          <table>
+            <thead><tr><th>PRT</th><th>PID</th><th>日均 Click</th><th>成功率</th><th>限流 Score</th><th>状态</th></tr></thead>
+            <tbody id="prt-pid-tbody"></tbody>
+          </table>
+        </section>
         <div class="conclusion"><strong>客观结论</strong><br>${escapeHtml(event.conclusion)}</div>
       `;
 
+      renderPrtPidHealth(event.prt_pid_health || []);
       drawCharts(event);
       sec.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    // Slice 9: PRT+PID 健康度 table fill
+    const PRT_PID_STATUS_LABEL = {
+      healthy:  '✅ 健康',
+      moderate: '⚠️ 中度',
+      severe:   '🔴 严重',
+      unknown:  '— 数据不足',
+    };
+
+    function formatClicks(n) {
+      // 1234567 → "1.2M", 12345 → "12.3K", 123 → "123"
+      if (n == null) return '-';
+      const abs = Math.abs(n);
+      if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return String(Math.round(n));
+    }
+
+    function formatPct(r) {
+      // 0.8734 → "87%". null → "-"
+      if (r == null) return '-';
+      return Math.round(r * 100) + '%';
+    }
+
+    function renderPrtPidHealth(rows) {
+      const tbody = document.getElementById('prt-pid-tbody');
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">数据不足</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const statusLabel = PRT_PID_STATUS_LABEL[r.status] || r.status;
+        return `<tr class="row-${escapeHtml(r.status)}">
+          <td>${escapeHtml(r.prt)}</td>
+          <td>${escapeHtml(r.pid)}</td>
+          <td class="num">${formatClicks(r.daily_clicks)}</td>
+          <td class="num">${formatPct(r.success_rate)}</td>
+          <td class="num">${r.score.toFixed(3)}</td>
+          <td>${statusLabel}</td>
+        </tr>`;
+      }).join('');
     }
 
     function drawCharts(event) {

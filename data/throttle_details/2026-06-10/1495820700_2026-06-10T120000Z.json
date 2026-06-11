@@ -7,6 +7,9 @@
   "event_duration_hours": 48,
   "is_resolved": false,
   "is_resolved_zh": "未恢复",
+  "recovery_ratio": 0.4507,
+  "status": "partial",
+  "status_zh": "部分缓解",
   "duration_tag": "Persistent Cap",
   "duration_tag_zh": "天级限流",
   "abnormal_tags": [
@@ -395,6 +398,38 @@
       "send_success_rate": 0.519223977299022,
       "discard_rate": 0.9961295929990244,
       "pipeline_success_rate": 0.519223977299022
+    }
+  ],
+  "prt_pid_health": [
+    {
+      "prt": "bidrunner",
+      "pid": "voltadszf_int",
+      "daily_clicks": 710576.3,
+      "success_rate": 0.424861,
+      "baseline_success_rate": 0.733174,
+      "score": 0.421,
+      "rank": 1,
+      "status": "moderate"
+    },
+    {
+      "prt": "bidrunner",
+      "pid": "windyadsd_int",
+      "daily_clicks": 673018.9,
+      "success_rate": 0.391167,
+      "baseline_success_rate": 0.673491,
+      "score": 0.419,
+      "rank": 2,
+      "status": "moderate"
+    },
+    {
+      "prt": "bidrunner",
+      "pid": "trendpulscl_int",
+      "daily_clicks": 389348.0,
+      "success_rate": 0.23976,
+      "baseline_success_rate": null,
+      "score": 0.0,
+      "rank": 3,
+      "status": "unknown"
     }
   ],
   "warnings": [
