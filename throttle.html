@@ -93,6 +93,7 @@
     .prt-pid-health { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; box-shadow: none; }
     .prt-pid-health h3 { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
     .prt-pid-health .hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .prt-pid-health th.num,
     .prt-pid-health td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .row-healthy  { color: #4ec9b0; }
     .row-moderate { color: #e3b341; }
@@ -328,7 +329,7 @@
           <h3>📊 PRT+PID 健康度 (过去 7 天)</h3>
           <p class="hint">按日均 click 排序, 推荐切流量到 ✅ 健康 行</p>
           <table>
-            <thead><tr><th>PRT</th><th>PID</th><th>日均 Click</th><th>成功率</th><th>限流 Score</th><th>状态</th></tr></thead>
+            <thead><tr><th>PRT</th><th>PID</th><th class="num">日均 Click</th><th class="num">成功率</th><th class="num">限流 Score</th><th>状态</th></tr></thead>
             <tbody id="prt-pid-tbody"></tbody>
           </table>
         </section>
