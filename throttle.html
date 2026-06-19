@@ -99,6 +99,11 @@
     .row-moderate { color: #e3b341; }
     .row-severe   { color: #f78166; }
     .row-unknown  { color: var(--muted); }
+    /* Slice 13: 限流根因 tag (字体小一号 = 11px, 跟 hint / card-tags 一致). span 显式 color 覆盖 row 行色 */
+    .root-cause-ruleclosed { color: #808080; font-size: 11px; }
+    .root-cause-admv       { color: #d97706; font-size: 11px; }
+    .root-cause-real       { color: #c53030; font-size: 11px; font-weight: 700; }
+    .root-cause-none       { color: var(--dim); }
     .muted-inline { color: var(--muted); font-weight: 400; font-size: .9em; }
 
     /* Manual query */
@@ -329,7 +334,7 @@
           <h3>📊 PRT+PID 健康度 (过去 7 天)</h3>
           <p class="hint">按日均 click 排序, 推荐切流量到 ✅ 健康 行</p>
           <table>
-            <thead><tr><th>PRT</th><th>PID</th><th class="num">日均 Click</th><th class="num">成功率</th><th class="num">限流 Score</th><th>状态</th></tr></thead>
+            <thead><tr><th>PRT</th><th>PID</th><th class="num">日均 Click</th><th class="num">成功率</th><th class="num">限流 Score</th><th>状态</th><th>根因</th></tr></thead>
             <tbody id="prt-pid-tbody"></tbody>
           </table>
         </section>
@@ -347,6 +352,13 @@
       moderate: '⚠️ 中度',
       severe:   '🔴 严重',
       unknown:  '— 数据不足',
+    };
+
+    // Slice 13: 根因 tag → CSS class. 后端只对 moderate/severe 行给非空 root_cause.
+    const ROOT_CAUSE_CLASS = {
+      '[规则关停]': 'root-cause-ruleclosed',
+      '[admv主动]': 'root-cause-admv',
+      '[真链路]':   'root-cause-real',
     };
 
     function formatClicks(n) {
@@ -368,11 +380,16 @@
       const tbody = document.getElementById('prt-pid-tbody');
       if (!tbody) return;
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">数据不足</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">数据不足</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {
         const statusLabel = PRT_PID_STATUS_LABEL[r.status] || r.status;
+        // Slice 13: 根因 cell. 空 (健康/数据不足行) → 灰 "—"; 有 tag → 对应颜色.
+        const rc = r.root_cause || '';
+        const rcCell = rc
+          ? `<span class="${ROOT_CAUSE_CLASS[rc] || ''}">${escapeHtml(rc)}</span>`
+          : '<span class="root-cause-none">—</span>';
         return `<tr class="row-${escapeHtml(r.status)}">
           <td>${escapeHtml(r.prt)}</td>
           <td>${escapeHtml(r.pid)}</td>
@@ -380,6 +397,7 @@
           <td class="num">${formatPct(r.success_rate)}</td>
           <td class="num">${r.score.toFixed(3)}</td>
           <td>${statusLabel}</td>
+          <td>${rcCell}</td>
         </tr>`;
       }).join('');
     }
