@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>限流分析 Slice 14 — OpenClaw</title>
+  <!-- Chart.js 4.4.0 (同 Slice 13 版本). annotation plugin 不再引入:
+       Slice 8C.3 注释已记录它在 Chart.js 4 + category scale 下解析失败 3 次,
+       垂直线沿用 native afterDraw 方案. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
+      --accent: #58a6ff; --green: #3fb950; --red: #f78166; --yellow: #e3b341;
+      --purple: #d2a8ff; --text: #e6edf3; --muted: #8b949e; --dim: #484f58;
+      --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh; padding: 20px 24px 40px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 40px; height: 40px; background: linear-gradient(135deg, #f78166 0%, #e3b341 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .header-title h1 { font-size: 18px; font-weight: 700; }
+    .header-title p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .scan-date-suffix { color: var(--muted); font-weight: 400; font-size: 0.65em; margin-left: 10px; letter-spacing: .5px; }
+    .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: var(--accent); }
+
+    /* 5 档 stat cards */
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); cursor: pointer; transition: border-color .15s; }
+    .stat-card:hover { border-color: var(--accent); }
+    .stat-card label { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+    .stat-card value { font-size: 26px; font-weight: 700; display: block; margin-top: 6px; }
+    .stat-card.a-severe value { color: var(--red); }
+    .stat-card.a-moderate value { color: var(--yellow); }
+    .stat-card.a-normal value { color: var(--green); }
+    .stat-card.a-dead value { color: var(--muted); }
+    .stat-card.a-insufficient value { color: var(--dim); }
+
+    section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; box-shadow: var(--shadow); }
+    section h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .section-meta { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+    /* 折叠分组 */
+    .group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+    .group-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface2); cursor: pointer; user-select: none; font-size: 13px; font-weight: 700; }
+    .group-head .caret { color: var(--muted); font-size: 11px; width: 12px; }
+    .group-head .cnt { color: var(--muted); font-weight: 400; font-size: 12px; }
+    .group-body { display: none; max-height: 420px; overflow-y: auto; }
+    .group.open .group-body { display: block; }
+    .g-severe .group-head { border-left: 3px solid var(--red); }
+    .g-moderate .group-head { border-left: 3px solid var(--yellow); }
+    .g-normal .group-head { border-left: 3px solid var(--green); }
+    .g-dead .group-head { border-left: 3px solid var(--muted); }
+    .g-insufficient .group-head { border-left: 3px solid var(--dim); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .3px; background: var(--surface2); position: sticky; top: 0; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover td { background: var(--surface2); }
+    tr.static-row td { color: var(--muted); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .act-severe { color: var(--red); font-weight: 700; }
+    .act-moderate { color: var(--yellow); font-weight: 700; }
+    .act-normal { color: var(--green); }
+    .act-dead, .act-insufficient { color: var(--muted); }
+    .muted { color: var(--muted); }
+
+    /* Detail */
+    #detail { display: none; }
+    #detail.open { display: block; }
+    .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .action-big { font-size: 30px; font-weight: 800; line-height: 1.1; }
+    .layer-chip { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 5px; background: var(--surface2); border: 1px solid var(--border); font-size: 12px; }
+    .edge-note { color: var(--yellow); font-size: 12px; margin-top: 6px; }
+    .close-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 12px; }
+
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+    .chart-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+    .chart-box.full { grid-column: 1 / -1; }
+    .chart-box h3 { font-size: 12px; margin-bottom: 8px; color: var(--muted); font-weight: 600; }
+    .chart-box canvas { height: 200px !important; }
+    .chart-box.full canvas { height: 260px !important; }
+
+    .evidence { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .evidence h3 { font-size: 12px; margin-bottom: 10px; color: var(--muted); }
+    .evidence ol { list-style: none; counter-reset: e; }
+    .evidence li { counter-increment: e; padding: 7px 0 7px 26px; position: relative; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .evidence li:last-child { border-bottom: none; }
+    .evidence li::before { content: counter(e); position: absolute; left: 0; top: 8px; width: 17px; height: 17px; border-radius: 50%; background: var(--accent); color: #000; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; }
+    .err { color: var(--red); font-size: 13px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">🚦</div>
+      <div class="header-title">
+        <h1>限流分析 <span class="scan-date-suffix" id="scan-date">—</span></h1>
+        <p>Slice 14 · HBB 基线 + Action 三档 + 证据链</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span class="badge" id="total-badge">—</span>
+      <span class="badge" id="gen-badge">—</span>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <section id="detail">
+    <div class="detail-head">
+      <div>
+        <div class="mono muted" id="d-key">—</div>
+        <div class="action-big" id="d-action">—</div>
+        <div><span class="layer-chip" id="d-layer">—</span></div>
+        <div class="edge-note" id="d-edge" style="display:none"></div>
+      </div>
+      <button class="close-btn" onclick="closeDetail()">✕ 关闭</button>
+    </div>
+    <div class="charts">
+      <div class="chart-box full"><h3>① SR 168h 时序 (主图)</h3><canvas id="c-sr"></canvas></div>
+      <div class="chart-box"><h3>② Clicks (total / success)</h3><canvas id="c-clicks"></canvas></div>
+      <div class="chart-box"><h3>③ Install</h3><canvas id="c-install"></canvas></div>
+      <div class="chart-box full"><h3>④ Cool 抛弃量</h3><canvas id="c-cool"></canvas></div>
+    </div>
+    <div class="evidence">
+      <h3>📋 证据链</h3>
+      <ol id="d-evidence"></ol>
+    </div>
+  </section>
+
+  <section id="overview">
+    <h2>📊 全站 (app, prt, pid) 分档 <span class="section-meta" id="ov-meta"></span></h2>
+    <div id="groups"><div class="empty">加载中…</div></div>
+  </section>
+
+<script>
+  // ── 数据源切换 (Task 4) ──────────────────────────────────────────────
+  // 生产: './data'  (dqc-dashboard-repo/data/)
+  // 测试: '.'       (/tmp/slice14_test/ 下 JSON 与 html 同级)
+  // ?base= 覆盖, 免改文件即可切换.
+  const DATA_BASE = new URLSearchParams(location.search).get('base') || './data/slice14';
+  const SCAN_DATE = new URLSearchParams(location.search).get('date') || '2026-07-14';
+
+  const ACTIONS = [
+    { key: '严重',      cls: 'severe',       icon: '🚨' },
+    { key: '一般',      cls: 'moderate',     icon: '⚠️' },
+    { key: '正常',      cls: 'normal',       icon: '✅' },
+    { key: '长期0转化', cls: 'dead',         icon: '⚫' },
+    { key: '数据不足',  cls: 'insufficient', icon: '⚪' },
+  ];
+
+  let summaryData = null;
+  let activeCharts = [];
+
+  // ── SR 格式化 (Task 3, 与 action.py _fmt_sr 口径一致) ────────────────
+  // >=10% 整数; <10% 两位小数. 实测 HBB.SR 低至 0.36%, 用整数会渲染成 "0%",
+  // 出现 "0% vs HBB 0% (△ 98%)" 的假象.
+  function fmtSr(x) {
+    if (x === null || x === undefined) return '—';
+    return x >= 0.10 ? (x * 100).toFixed(0) + '%' : (x * 100).toFixed(2) + '%';
+  }
+  function fmtDrop(x) {
+    if (x === null || x === undefined) return '—';
+    return (x * 100).toFixed(0) + '%';
+  }
+  function fmtNum(n) {
+    if (n === null || n === undefined) return '—';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+    return String(Math.round(n));
+  }
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ── init ────────────────────────────────────────────────────────────
+  async function init() {
+    try {
+      const url = `${DATA_BASE}/throttle_summary_${SCAN_DATE}.json`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`找不到 ${url} (HTTP ${resp.status})`);
+      summaryData = await resp.json();
+      renderStats();
+      renderGroups();
+    } catch (e) {
+      document.getElementById('groups').innerHTML =
+        `<div class="err">加载失败: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function renderStats() {
+    document.getElementById('scan-date').textContent = summaryData.scan_date;
+    const total = summaryData.groups.length;
+    document.getElementById('total-badge').textContent = `${total} 组`;
+    document.getElementById('gen-badge').textContent = summaryData.generated_at;
+    document.getElementById('ov-meta').textContent =
+      `共 ${total} 组 · 严重/一般可点开详情`;
+    document.getElementById('stats').innerHTML = ACTIONS.map(a => `
+      <div class="stat-card a-${a.cls}" onclick="toggleGroup('${a.cls}', true)">
+        <label>${a.icon} ${a.key}</label>
+        <value>${summaryData.counts[a.key] ?? 0}</value>
+      </div>`).join('');
+  }
+
+  function renderGroups() {
+    const byAction = {};
+    for (const g of summaryData.groups) (byAction[g.action] ||= []).push(g);
+    document.getElementById('groups').innerHTML = ACTIONS.map(a => {
+      const rows = byAction[a.key] || [];
+      // 严重默认展开 (AM 一进来就要看的); 其余折叠, 避免 1366 行一次性铺开
+      const open = a.key === '严重' ? ' open' : '';
+      return `
+        <div class="group g-${a.cls}${open}" id="grp-${a.cls}">
+          <div class="group-head" onclick="toggleGroup('${a.cls}')">
+            <span class="caret">▶</span>
+            <span>${a.icon} ${a.key}</span>
+            <span class="cnt">${rows.length} 组</span>
+          </div>
+          <div class="group-body">${rows.length ? tableFor(rows) :
+            '<div class="empty">无</div>'}</div>
+        </div>`;
+    }).join('');
+    syncCarets();
+  }
+
+  function tableFor(rows) {
+    return `<table>
+      <thead><tr>
+        <th>APP</th><th>PRT</th><th>PID</th><th>Action</th><th>层级</th>
+        <th class="num">当前 SR</th><th class="num">HBB SR</th>
+        <th class="num">SR △</th><th class="num">install △</th>
+      </tr></thead>
+      <tbody>${rows.map(r => {
+        const cls = ACTIONS.find(a => a.key === r.action).cls;
+        const click = r.has_detail
+          ? ` class="clickable" onclick="showDetail('${esc(r.app_name)}','${esc(r.prt)}','${esc(r.pid)}')"`
+          : ' class="static-row"';
+        return `<tr${click}>
+          <td class="mono">${esc(r.app_name)}</td>
+          <td class="mono">${esc(r.prt)}</td>
+          <td class="mono">${esc(r.pid)}</td>
+          <td class="act-${cls}">${esc(r.action)}</td>
+          <td>${r.layer ? esc(r.layer) : '<span class="muted">—</span>'}</td>
+          <td class="num">${fmtSr(r.current_sr)}</td>
+          <td class="num">${fmtSr(r.hbb_sr)}</td>
+          <td class="num">${fmtDrop(r.sr_drop)}</td>
+          <td class="num">${fmtDrop(r.install_drop)}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  function toggleGroup(cls, forceOpen) {
+    const el = document.getElementById('grp-' + cls);
+    if (!el) return;
+    if (forceOpen) { el.classList.add('open'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else el.classList.toggle('open');
+    syncCarets();
+  }
+  function syncCarets() {
+    document.querySelectorAll('.group').forEach(g => {
+      g.querySelector('.caret').textContent = g.classList.contains('open') ? '▼' : '▶';
+    });
+  }
+
+  // ── Detail ──────────────────────────────────────────────────────────
+  async function showDetail(app, prt, pid) {
+    const url = `${DATA_BASE}/throttle_details/${summaryData.scan_date}/${app}_${prt}_${pid}.json`;
+    let d;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      d = await resp.json();
+    } catch (e) {
+      alert(`加载详情失败: ${e.message}\n${url}`);
+      return;
+    }
+    renderDetail(d);
+    document.getElementById('detail').classList.add('open');
+    document.getElementById('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function closeDetail() {
+    document.getElementById('detail').classList.remove('open');
+    destroyCharts();
+  }
+  function destroyCharts() {
+    activeCharts.forEach(c => c.destroy());
+    activeCharts = [];
+  }
+
+  function renderDetail(d) {
+    destroyCharts();
+    const cls = ACTIONS.find(a => a.key === d.action).cls;
+    document.getElementById('d-key').textContent = `${d.app_name} / ${d.prt} / ${d.pid}`;
+    const act = document.getElementById('d-action');
+    act.textContent = d.action;
+    act.className = 'action-big act-' + cls;
+    document.getElementById('d-layer').textContent = d.layer ? `影响层级 · ${d.layer}` : '影响层级 · —';
+
+    const edge = document.getElementById('d-edge');
+    if (d.evidence.limit_start_at_edge) {
+      edge.style.display = 'block';
+      edge.textContent = '⚠️ 限流起点 ≥7天前 — 真实起点在 168h 窗口之外, 下方图中不画起点线';
+    } else {
+      edge.style.display = 'none';
+    }
+
+    document.getElementById('d-evidence').innerHTML =
+      (d.evidence_chain || []).map(l => `<li>${esc(l)}</li>`).join('');
+
+    drawCharts(d);
+  }
+
+  // ── 168h charts ─────────────────────────────────────────────────────
+  function drawCharts(d) {
+    const h = d.hourly_168 || [];
+    // labels 用完整 dt, 但 x 轴只在每天 00:00 显示刻度 —— 168 个标签全画会糊成一片
+    const labels = h.map(x => x.dt);
+    const dayTick = i => labels[i].slice(11, 13) === '00' ? labels[i].slice(5, 10) : '';
+
+    // 限流起点垂直线: 用 dt 全串精确匹配取 numeric index.
+    // Slice 8C.3 的教训是 labels.indexOf 在重复 string 上不可靠; 这里 dt 含日期,
+    // 168 个值天然唯一, indexOf 安全. at_edge 时不画 (起点在窗口外, 画左边界是假精度).
+    const startIdx = (d.evidence.limit_start_at_edge || !d.evidence.limit_start_time)
+      ? -1 : labels.indexOf(d.evidence.limit_start_time);
+
+    const linePlugin = {
+      id: 'limitStartLine',
+      afterDraw(chart) {
+        if (startIdx < 0) return;
+        const xs = chart.scales.x, ys = chart.scales.y;
+        const x = xs.getPixelForValue(startIdx);
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#ffff00';
+        ctx.beginPath();
+        ctx.moveTo(x, ys.top); ctx.lineTo(x, ys.bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        const txt = '限流开始';
+        ctx.font = 'bold 10px -apple-system, system-ui, sans-serif';
+        const tw = ctx.measureText(txt).width, pad = 5;
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(x - tw / 2 - pad, ys.top - 19, tw + pad * 2, 16);
+        ctx.fillStyle = '#000';
+        ctx.fillText(txt, x - tw / 2, ys.top - 7);
+        ctx.restore();
+      }
+    };
+
+    const base = (yFmt) => ({
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e6edf3', font: { size: 10 }, boxWidth: 12 } },
+        tooltip: {
+          enabled: true, mode: 'index', intersect: false,
+          callbacks: { title: items => items[0].label.replace('T', ' ').replace('Z', ' UTC') }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 9 }, autoSkip: false,
+                      maxRotation: 0, callback: (v, i) => dayTick(i) },
+             grid: { color: 'rgba(255,255,255,.04)' } },
+        y: { ticks: { color: '#8b949e', font: { size: 9 }, callback: yFmt },
+             grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true }
+      }
+    });
+
+    const mk = (id, datasets, yFmt) => activeCharts.push(new Chart(
+      document.getElementById(id),
+      { type: 'line', data: { labels, datasets }, options: base(yFmt), plugins: [linePlugin] }
+    ));
+
+    // ① SR 主图. HBB 基线画成水平参考线 (dataset 而非 annotation)
+    const hbb = d.evidence.hbb_sr;
+    mk('c-sr', [
+      { label: '当前 SR', data: h.map(x => x.sr), borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,.12)', fill: true, tension: .15,
+        borderWidth: 1.6, pointRadius: 0, spanGaps: false },
+      { label: `HBB 基线 (${fmtSr(hbb)})`, data: h.map(() => hbb),
+        borderColor: '#3fb950', borderDash: [5, 4], borderWidth: 1.2,
+        pointRadius: 0, fill: false }
+    ], v => (v * 100).toFixed(0) + '%');
+
+    mk('c-clicks', [
+      { label: 'total_clicks', data: h.map(x => x.total_clicks), borderColor: '#58a6ff',
+        tension: .15, borderWidth: 1.4, pointRadius: 0 },
+      { label: 'success_clicks', data: h.map(x => x.success_clicks), borderColor: '#3fb950',
+        tension: .15, borderWidth: 1.4, pointRadius: 0 }
+    ], fmtNum);
+
+    mk('c-install', [
+      { label: 'install', data: h.map(x => x.install), borderColor: '#d2a8ff',
+        backgroundColor: 'rgba(210,168,255,.12)', fill: true,
+        tension: .15, borderWidth: 1.4, pointRadius: 0 }
+    ], fmtNum);
+
+    mk('c-cool', [
+      { label: 'cool_cnt', data: h.map(x => x.cool_cnt), borderColor: '#e3b341',
+        backgroundColor: 'rgba(227,179,65,.12)', fill: true,
+        tension: .15, borderWidth: 1.4, pointRadius: 0 }
+    ], fmtNum);
+  }
+
+  init();
+</script>
+</body>
+</html>
