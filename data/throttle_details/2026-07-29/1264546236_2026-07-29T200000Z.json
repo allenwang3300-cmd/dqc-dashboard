@@ -1,0 +1,307 @@
+{
+  "app_name": "1264546236",
+  "advertiser_name": "KGMedia",
+  "adv_manager": "helin",
+  "t0": "2026-07-29T20:00:00Z",
+  "t_end": "2026-07-31T20:00:00Z",
+  "event_duration_hours": 48,
+  "is_resolved": false,
+  "is_resolved_zh": "未恢复",
+  "recovery_ratio": 0.223,
+  "status": "severe",
+  "status_zh": "严重限流",
+  "duration_tag": "Persistent Cap",
+  "duration_tag_zh": "天级限流",
+  "abnormal_tags": [
+    "Send Limited",
+    "Offer Cool Limited",
+    "Multi-Layer Cascade"
+  ],
+  "abnormal_tags_zh": [
+    "发送成功率受阻",
+    "丢弃率走高",
+    "链路同步塌方·疑似MMP"
+  ],
+  "limit_score": 0.4401,
+  "limit_score_final": 0.8802,
+  "duration_multiplier_applied": 2.0,
+  "severity": "Severe",
+  "severity_zh": "严重",
+  "confidence_level": "Low",
+  "pre_baseline_quality": "不可信",
+  "cr_real_distorted": true,
+  "cr_real_distorted_zh": "CR失真",
+  "cascade_correlation": null,
+  "metrics": {
+    "task_execution_rate": {
+      "pre": 1.0,
+      "during": 1.0,
+      "delta": 0.0
+    },
+    "send_success_rate": {
+      "pre": 0.750357,
+      "during": 0.167299,
+      "delta": -0.777
+    },
+    "pipeline_success_rate": {
+      "pre": 0.750357,
+      "during": 0.167299,
+      "delta": -0.777
+    },
+    "discard_rate": {
+      "pre": 0.537259,
+      "during": 0.860081,
+      "delta": 0.3228,
+      "delta_pp": 0.3228217085181321
+    },
+    "cr_nominal": {
+      "pre": 1.5e-05,
+      "during": 8e-06,
+      "delta": -0.4738
+    },
+    "cr_real": {
+      "pre": 2e-05,
+      "during": 4.7e-05,
+      "delta": 1.3602
+    },
+    "reject_rate": {
+      "pre": 0.029412,
+      "during": 0.0,
+      "delta": -0.0294,
+      "delta_pp": -0.029411764705882353
+    },
+    "event_rate": {
+      "pre": 0.147059,
+      "during": 0.0,
+      "delta": -1.0
+    },
+    "install_per_hour": {
+      "pre": 5.67,
+      "during": 0.15,
+      "delta": -0.9743
+    },
+    "ts_success_per_hour": {
+      "pre": 287594.83,
+      "during": 3135.83,
+      "delta": -0.9891
+    },
+    "common_clicks_per_hour": {
+      "pre": 383277.33,
+      "during": 18743.9,
+      "delta": -0.9511
+    },
+    "revenue_per_hour": {
+      "pre": 1.67,
+      "during": 0.0,
+      "delta": -1.0
+    }
+  },
+  "hourly_timeline": [
+    {
+      "dt": "2026-07-29T14:00:00Z",
+      "phase": "pre",
+      "clicks": 324185,
+      "ts_total": 324185,
+      "ts_success": 280352,
+      "oc_discard": 79229,
+      "installs": 2,
+      "events": 1,
+      "revenue": 2.0,
+      "true_install": 8,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.8647901661088576,
+      "discard_rate": 0.22033700334556053,
+      "pipeline_success_rate": 0.8647901661088576
+    },
+    {
+      "dt": "2026-07-29T15:00:00Z",
+      "phase": "pre",
+      "clicks": 334638,
+      "ts_total": 334638,
+      "ts_success": 292471,
+      "oc_discard": 165984,
+      "installs": 10,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 15,
+      "reject_install": 1,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.8739921945505292,
+      "discard_rate": 0.36205080106008225,
+      "pipeline_success_rate": 0.8739921945505292
+    },
+    {
+      "dt": "2026-07-29T16:00:00Z",
+      "phase": "pre",
+      "clicks": 421072,
+      "ts_total": 421072,
+      "ts_success": 349658,
+      "oc_discard": 376354,
+      "installs": 9,
+      "events": 2,
+      "revenue": 4.0,
+      "true_install": 14,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.8303995516206254,
+      "discard_rate": 0.518385371040699,
+      "pipeline_success_rate": 0.8303995516206254
+    },
+    {
+      "dt": "2026-07-29T17:00:00Z",
+      "phase": "pre",
+      "clicks": 458601,
+      "ts_total": 458601,
+      "ts_success": 353221,
+      "oc_discard": 486969,
+      "installs": 9,
+      "events": 2,
+      "revenue": 4.0,
+      "true_install": 15,
+      "reject_install": 1,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.7702141949101725,
+      "discard_rate": 0.5795939013794499,
+      "pipeline_success_rate": 0.7702141949101725
+    },
+    {
+      "dt": "2026-07-29T18:00:00Z",
+      "phase": "pre",
+      "clicks": 418486,
+      "ts_total": 418486,
+      "ts_success": 282964,
+      "oc_discard": 476690,
+      "installs": 3,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 8,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.6761612096939922,
+      "discard_rate": 0.6275093661061484,
+      "pipeline_success_rate": 0.6761612096939922
+    },
+    {
+      "dt": "2026-07-29T19:00:00Z",
+      "phase": "pre",
+      "clicks": 342682,
+      "ts_total": 342682,
+      "ts_success": 166903,
+      "oc_discard": 418225,
+      "installs": 1,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 6,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.48704921764201214,
+      "discard_rate": 0.7147581383902326,
+      "pipeline_success_rate": 0.48704921764201214
+    },
+    {
+      "dt": "2026-07-29T20:00:00Z",
+      "phase": "during",
+      "clicks": 264663,
+      "ts_total": 264663,
+      "ts_success": 70458,
+      "oc_discard": 277260,
+      "installs": 2,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 6,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.26621779394928646,
+      "discard_rate": 0.7973702828153849,
+      "pipeline_success_rate": 0.26621779394928646
+    },
+    {
+      "dt": "2026-07-29T21:00:00Z",
+      "phase": "during",
+      "clicks": 253550,
+      "ts_total": 253550,
+      "ts_success": 43738,
+      "oc_discard": 196896,
+      "installs": 2,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 5,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.172502464997042,
+      "discard_rate": 0.8182384866643949,
+      "pipeline_success_rate": 0.172502464997042
+    },
+    {
+      "dt": "2026-07-29T22:00:00Z",
+      "phase": "during",
+      "clicks": 184521,
+      "ts_total": 184521,
+      "ts_success": 21027,
+      "oc_discard": 140013,
+      "installs": 1,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 7,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.1139545092428504,
+      "discard_rate": 0.8694299552906111,
+      "pipeline_success_rate": 0.1139545092428504
+    },
+    {
+      "dt": "2026-07-29T23:00:00Z",
+      "phase": "during",
+      "clicks": 196973,
+      "ts_total": 196973,
+      "ts_success": 15297,
+      "oc_discard": 311077,
+      "installs": 2,
+      "events": 0,
+      "revenue": 0.0,
+      "true_install": 2,
+      "reject_install": 0,
+      "task_execution_rate": 1.0,
+      "send_success_rate": 0.07766039000269072,
+      "discard_rate": 0.9531304576957723,
+      "pipeline_success_rate": 0.07766039000269072
+    }
+  ],
+  "prt_pid_health": [
+    {
+      "prt": "kgmediagroup",
+      "pid": "trendpulscl_int",
+      "daily_clicks": 8430910.6,
+      "success_rate": 0.679242,
+      "baseline_success_rate": 0.797958,
+      "score": 0.149,
+      "rank": 1,
+      "status": "healthy",
+      "root_cause": ""
+    }
+  ],
+  "warnings": [
+    {
+      "key": "baseline_unhealthy",
+      "message": "⚠️ Baseline 自身可能处于限流状态, 结果仅供参考"
+    },
+    {
+      "key": "cr_real_distorted",
+      "message": "⚠️ 真实CR当前数值不可信: 送出层塌方导致虚高, 请同时查看 ts_success"
+    },
+    {
+      "key": "pipeline_trend_only",
+      "message": "仅趋势观察, 不可解释为全系统真实成功率"
+    },
+    {
+      "key": "prt_pid_fraud_unavailable",
+      "message": "PRT/PID 维度的 Fraud 拦截率暂不可用 (block_report_hourly 缺字段)"
+    },
+    {
+      "key": "block_reason_day_only",
+      "message": "block_reason 仅 day 粒度, 不能强绑定到具体小时"
+    }
+  ],
+  "conclusion": "事件持续 48 小时, 时长标签为「天级限流」, 状态: 未恢复. 异常层级: 发送成功率受阻, 丢弃率走高. 同时命中「链路同步塌方·疑似MMP」, 强暗示 MMP 端或网络出站层共同根因. 综合判定严重度: 严重 (limit_score_final=0.880), 置信度: Low. ⚠️ 真实CR当前数值不可信: 送出层塌方导致虚高, 请同时查看 ts_success"
+}
