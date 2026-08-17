@@ -1,0 +1,86 @@
+{
+  "scan_date": "2026-08-16",
+  "scan_timestamp": "2026-08-17T02:56:47.219876+00:00",
+  "version": "v5.2",
+  "summary": {
+    "total_scanned": 2,
+    "candidates_found": 2,
+    "unique_app_count": 2,
+    "severe_count": 1,
+    "persistent_count": 1,
+    "alert_24h_count": 1
+  },
+  "alerts_24h": [
+    {
+      "app_name": "com.gateio.gateio",
+      "advertiser_name": "Gate.IO-Sylva",
+      "adv_manager": "Sylva",
+      "t0": "2026-08-16T17:00:00Z",
+      "event_duration_hours": 48,
+      "is_resolved": false,
+      "status": "recovered",
+      "status_zh": "完全恢复",
+      "severity": "Severe",
+      "severity_zh": "严重"
+    }
+  ],
+  "top_apps": [
+    {
+      "app_name": "com.gateio.gateio",
+      "advertiser_name": "Gate.IO-Sylva",
+      "adv_manager": "Sylva",
+      "t0": "2026-08-16T17:00:00Z",
+      "event_duration_hours": 48,
+      "is_resolved": false,
+      "is_resolved_zh": "未恢复",
+      "duration_tag": "Persistent Cap",
+      "duration_tag_zh": "天级限流",
+      "status": "recovered",
+      "status_zh": "完全恢复",
+      "abnormal_tags": [
+        "Execution Limited",
+        "Offer Cool Limited",
+        "Multi-Layer Cascade"
+      ],
+      "abnormal_tags_zh": [
+        "执行率受阻",
+        "丢弃率走高",
+        "链路同步塌方·疑似MMP"
+      ],
+      "limit_score_final": 0.5104,
+      "severity": "Severe",
+      "severity_zh": "严重",
+      "confidence_level": "Low",
+      "cr_real_distorted": true
+    },
+    {
+      "app_name": "in.swiggy.android",
+      "advertiser_name": "Adtriumph",
+      "adv_manager": "Mia",
+      "t0": "2026-08-16T00:00:00Z",
+      "event_duration_hours": 5,
+      "is_resolved": true,
+      "is_resolved_zh": "已恢复",
+      "duration_tag": "Spike Cascade",
+      "duration_tag_zh": "6小时内限流",
+      "status": "partial",
+      "status_zh": "部分缓解",
+      "abnormal_tags": [
+        "Send Limited",
+        "Fraud Limited",
+        "Multi-Layer Cascade"
+      ],
+      "abnormal_tags_zh": [
+        "发送成功率受阻",
+        "Fraud异常上升",
+        "链路同步塌方·疑似MMP"
+      ],
+      "limit_score_final": 0.1961,
+      "severity": "Light",
+      "severity_zh": "轻度",
+      "confidence_level": "High",
+      "cr_real_distorted": true
+    }
+  ],
+  "unaffected_apps": []
+}
